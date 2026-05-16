@@ -1,0 +1,17 @@
+[Unit]
+Description=Window Plane HUD
+After=network.target readsb.service
+Wants=readsb.service
+
+[Service]
+Type=simple
+User=arash
+WorkingDirectory=/home/arash/projects/thats-why-they-call-it-window-plane
+Environment=PORT=3000
+Environment=AIRCRAFT_JSON_PATH=/run/readsb/aircraft.json
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
