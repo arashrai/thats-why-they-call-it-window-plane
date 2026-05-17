@@ -168,39 +168,6 @@ If it works, stop it with:
 Ctrl+C
 ```
 
-If you get a permissions error like:
-
-```text
-usb_open error -3
-Please fix the device permissions
-```
-
-add udev rules:
-
-```bash
-sudo tee /etc/udev/rules.d/20-rtl-sdr.rules > /dev/null <<'EOF'
-SUBSYSTEM=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2832", GROUP="plugdev", MODE="0666", SYMLINK+="rtl_sdr"
-SUBSYSTEM=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2838", GROUP="plugdev", MODE="0666", SYMLINK+="rtl_sdr"
-EOF
-
-sudo udevadm control --reload-rules
-sudo udevadm trigger
-sudo usermod -aG plugdev arash
-sudo reboot
-```
-
-Reconnect and test again:
-
-```bash
-rtl_test
-```
-
-Stop with:
-
-```text
-Ctrl+C
-```
-
 Important: only one process can use the SDR at a time. Stop `rtl_test` before starting `readsb`.
 
 ## Install readsb
@@ -208,7 +175,7 @@ Important: only one process can use the SDR at a time. Stop `rtl_test` before st
 Install `readsb`:
 
 ```bash
-bash -c "$(curl -L -o - https://github.com/wiedehopf/adsb-scripts/raw/master/readsb-install.sh)"
+sudo bash -c "$(curl -L -o - https://github.com/wiedehopf/adsb-scripts/raw/master/readsb-install.sh)"
 ```
 
 Check status:
@@ -236,7 +203,7 @@ This file is the local aircraft feed used by the Window Plane app.
 Install `tar1090`:
 
 ```bash
-bash -c "$(curl -L -o - https://github.com/wiedehopf/tar1090/raw/master/install.sh)"
+sudo bash -c "$(curl -L -o - https://github.com/wiedehopf/tar1090/raw/master/install.sh)"
 ```
 
 Open the debug map from a browser on your Mac:
