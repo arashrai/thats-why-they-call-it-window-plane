@@ -9,9 +9,15 @@ sudo apt install -y \
   nodejs \
   npm \
   rtl-sdr \
-  cage \
-  dbus-x11 \
-  chromium \
-  unclutter
+  avahi-daemon
 
-echo "Installed Pi dependencies."
+sudo systemctl enable ssh
+sudo systemctl enable avahi-daemon
+sudo systemctl restart avahi-daemon
+
+echo "Installed base Pi dependencies."
+echo
+echo "Next steps:"
+echo "  1. Test RTL-SDR with: rtl_test"
+echo "  2. Install ADS-B stack with: ./scripts/install-adsb-stack.sh"
+echo "  3. Install app dependencies with: npm install"
