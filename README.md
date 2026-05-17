@@ -6,7 +6,7 @@ This project receives ADS-B aircraft broadcasts locally, decodes them with `read
 
 ## Current setup
 
-This README covers setup through the stable base stage:
+This README covers the stable base setup:
 
 - Raspberry Pi is reachable over SSH
 - RTL-SDR dongle is detected
@@ -134,13 +134,34 @@ Reconnect:
 ssh arash@windowplane.local
 ```
 
-## Install base packages
+## Clone the repo
 
 ```bash
-sudo apt install -y git curl rtl-sdr nodejs npm
+mkdir -p ~/projects
+cd ~/projects
+git clone https://github.com/arashrai/thats-why-they-call-it-window-plane.git
+cd thats-why-they-call-it-window-plane
 ```
 
-## RTL-SDR setup
+If the repo already exists:
+
+```bash
+cd ~/projects/thats-why-they-call-it-window-plane
+git pull
+```
+
+## Install base Pi dependencies
+
+From the repo root:
+
+```bash
+chmod +x scripts/*.sh
+./scripts/install-pi-deps.sh
+```
+
+This installs the base OS packages needed for the stable setup.
+
+## Test the RTL-SDR dongle
 
 Plug in the RTL-SDR dongle.
 
@@ -170,15 +191,20 @@ Ctrl+C
 
 Important: only one process can use the SDR at a time. Stop `rtl_test` before starting `readsb`.
 
-## Install readsb
+## Install ADS-B stack
 
-Install `readsb`:
+From the repo root:
 
 ```bash
-sudo bash -c "$(curl -L -o - https://github.com/wiedehopf/adsb-scripts/raw/master/readsb-install.sh)"
+./scripts/install-adsb-stack.sh
 ```
 
-Check status:
+This installs:
+
+- `readsb`
+- `tar1090`
+
+Check `readsb`:
 
 ```bash
 sudo systemctl status readsb --no-pager
@@ -198,15 +224,9 @@ cat /run/readsb/aircraft.json | python3 -m json.tool | head -80
 
 This file is the local aircraft feed used by the Window Plane app.
 
-## Install tar1090
+## Open tar1090 debug map
 
-Install `tar1090`:
-
-```bash
-sudo bash -c "$(curl -L -o - https://github.com/wiedehopf/tar1090/raw/master/install.sh)"
-```
-
-Open the debug map from a browser on your Mac:
+From a browser on your Mac:
 
 ```text
 http://windowplane.local/tar1090/
@@ -223,7 +243,7 @@ sudo systemctl status readsb --no-pager
 cat /run/readsb/aircraft.json | python3 -m json.tool | head -80
 ```
 
-From Mac browser:
+From a browser on your Mac:
 
 ```text
 http://windowplane.local/tar1090/
@@ -248,29 +268,17 @@ Browser:
 http://windowplane.local/tar1090/
 ```
 
-## Clone the Window Plane repo
-
-```bash
-mkdir -p ~/projects
-cd ~/projects
-git clone https://github.com/arashrai/thats-why-they-call-it-window-plane.git
-cd thats-why-they-call-it-window-plane
-```
-
-If the repo already exists:
-
-```bash
-cd ~/projects/thats-why-they-call-it-window-plane
-git pull
-```
-
 ## Install app dependencies
+
+From the repo root:
 
 ```bash
 npm install
 ```
 
 ## Run the app manually
+
+From the repo root:
 
 ```bash
 npm start
@@ -400,12 +408,12 @@ npm start
 
 ADS-B provides local aircraft state such as:
 
-* callsign / flight number
-* altitude
-* speed
-* heading
-* latitude / longitude, when available
-* signal age
-* RSSI
+- callsign / flight number
+- altitude
+- speed
+- heading
+- latitude / longitude, when available
+- signal age
+- RSSI
 
-ADS-B does not provide origin/destination route information.
+ADS-B does not generally provide origin/destination route information.
