@@ -1,4 +1,3 @@
-````markdown
 # That's Why They Call It Window Plane
 
 A local-first aircraft HUD for showing nearby planes using a Raspberry Pi and RTL-SDR dongle.
@@ -36,7 +35,7 @@ RTL-SDR dongle
 Raspberry Pi
   ↓ Wi-Fi
 Local web UI
-````
+```
 
 For ADS-B at 1090 MHz, start with the antenna vertical near a window.
 
