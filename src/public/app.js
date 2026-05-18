@@ -174,4 +174,4 @@ async function refresh() {
 
 ensureHud();
 refresh();
-setInterval(refresh, 500);
+setInterval(refresh, 250);

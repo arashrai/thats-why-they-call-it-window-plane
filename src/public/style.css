@@ -133,7 +133,7 @@ main {
   transform: rotate(var(--arrow-angle));
   transform-origin: center;
   transition:
-    transform 500ms linear,
+    transform 250ms linear,
     opacity 200ms ease;
   pointer-events: none;
   will-change: transform;

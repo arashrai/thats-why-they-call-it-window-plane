@@ -194,14 +194,14 @@ function bearingToUiAngleDeg(bearingFromHomeDeg) {
     HOME.downBearingDeg
   );
 
-  // Screen convention:
+  // Screen coordinate convention:
   // 0° = right, 90° = down, 180° = left, 270° = up.
   //
   // If DOWN_BEARING_DEG is 120:
   // bearing 120 -> 90°  -> down
-  // bearing 130 -> 100° -> down-left
-  // bearing 110 -> 80°  -> down-right
-  return normalizeDeg(90 + diffFromDown * HOME.bearingToUiScale);
+  // bearing 140 -> 70°  -> down-right
+  // bearing 100 -> 110° -> down-left
+  return normalizeDeg(90 - diffFromDown * HOME.bearingToUiScale);
 }
 
 function isSelectableAircraft(a) {
