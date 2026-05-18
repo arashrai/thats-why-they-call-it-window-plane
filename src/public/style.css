@@ -33,6 +33,12 @@ main {
   position: relative;
 }
 
+.hud-root {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
 .plane-count {
   position: absolute;
   top: 4vh;
@@ -55,11 +61,6 @@ main {
   letter-spacing: 0.02em;
 }
 
-.hud-orbit {
-  position: absolute;
-  inset: 0;
-}
-
 .plane-info {
   position: absolute;
   left: 50%;
@@ -68,10 +69,6 @@ main {
   transform: translate(-50%, -50%);
   text-align: center;
   z-index: 2;
-}
-
-.plane-info.empty {
-  width: 90vw;
 }
 
 .flight {
@@ -112,17 +109,52 @@ main {
   opacity: 0.62;
 }
 
+/*
+  The orbit is fixed at the exact center of the HUD/text.
+  It rotates as a whole. The arrow is placed at a fixed radius on that orbit.
+
+  CSS angle convention here:
+  0deg   = right
+  90deg  = down
+  180deg = left
+  270deg = up
+*/
+.arrow-orbit {
+  --arrow-angle: 90deg;
+  --orbit-radius: min(41vh, 41vw);
+
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  z-index: 3;
+  transform: rotate(var(--arrow-angle));
+  transform-origin: center;
+  transition:
+    transform 500ms linear,
+    opacity 250ms ease;
+  opacity: 0.92;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.arrow-orbit.hidden {
+  opacity: 0;
+}
+
 .look-arrow {
   position: absolute;
+  left: 0;
+  top: 0;
   width: clamp(80px, 11vw, 220px);
   height: clamp(40px, 5.5vw, 110px);
-  z-index: 1;
-  opacity: 0.92;
-  transition:
-    left 420ms linear,
-    top 420ms linear,
-    transform 420ms linear,
-    opacity 250ms ease;
+
+  /*
+    Move the arrow outward along the rotated orbit's local +X axis.
+    Because the parent rotates, this becomes a true circular orbit.
+  */
+  transform: translateX(var(--orbit-radius)) translate(-50%, -50%);
   filter: drop-shadow(0 0 18px rgba(255, 255, 255, 0.45));
 }
 
@@ -156,5 +188,9 @@ main {
 
   .metrics {
     font-size: 4.5vw;
+  }
+
+  .arrow-orbit {
+    --orbit-radius: min(38vh, 38vw);
   }
 }

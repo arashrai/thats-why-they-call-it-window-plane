@@ -38,81 +38,110 @@ function formatVerticalRate(fpm) {
   return fpm > 0 ? "climbing" : "descending";
 }
 
-function arrowPosition(uiAngleDeg) {
-  const angleRad = (uiAngleDeg * Math.PI) / 180;
+function ensureHud() {
+  if (document.getElementById("hud-root")) return;
 
-  // Larger orbit so the arrow doesn't collide with text.
-  // The text block is centered; this places the arrow around the outside.
-  const radiusX = 36;
-  const radiusY = 36;
+  aircraftEl.innerHTML = `
+    <div id="hud-root" class="hud-root">
+      <div id="plane-count" class="plane-count">0 planes</div>
+      <div id="calibration-readout" class="calibration-readout"></div>
 
-  return {
-    left: 50 + Math.cos(angleRad) * radiusX,
-    top: 50 + Math.sin(angleRad) * radiusY
-  };
-}
-
-function planeHtml(plane, total) {
-  const uiAngle = plane.uiAngleDeg ?? 90;
-  const pos = arrowPosition(uiAngle);
-
-  return `
-    <div class="plane-count">${total} planes</div>
-
-    <div class="calibration-readout">
-      ${formatBearing(plane.bearingFromHomeDeg)} · ${formatElevation(plane.elevationAngleDeg)}
-    </div>
-
-    <div class="hud-orbit">
-      <div
-        class="look-arrow"
-        style="
-          left: ${pos.left}%;
-          top: ${pos.top}%;
-          transform: translate(-50%, -50%) rotate(${uiAngle}deg);
-        "
-        aria-hidden="true"
-      >
-        <svg viewBox="0 0 120 60" role="img">
-          <path d="M8 30 H92" class="arrow-line" />
-          <path d="M72 10 L102 30 L72 50" class="arrow-head" />
-        </svg>
+      <div id="arrow-orbit" class="arrow-orbit" aria-hidden="true">
+        <div class="look-arrow">
+          <svg viewBox="0 0 120 60" role="img">
+            <path d="M8 30 H92" class="arrow-line" />
+            <path d="M72 10 L102 30 L72 50" class="arrow-head" />
+          </svg>
+        </div>
       </div>
 
-      <section class="plane-info">
-        <div class="flight">${plane.displayName}</div>
-        <div class="aircraft-type">${plane.aircraftType || "aircraft type unknown"}</div>
+      <section id="plane-info" class="plane-info">
+        <div id="flight" class="flight"></div>
+        <div id="aircraft-type" class="aircraft-type"></div>
 
-        <div class="metrics primary-metrics">
-          ${formatDistance(plane.distanceKm)} · ${formatAltitude(plane.altitudeFt)}
-        </div>
-
-        <div class="metrics">
-          ${formatSpeedKmh(plane.groundSpeedKmh)} · ${formatVerticalRate(plane.verticalRateFpm)}
-        </div>
-
-        <div class="updated">
-          ${formatUpdated(plane.seenSec)}
-        </div>
+        <div id="primary-metrics" class="metrics primary-metrics"></div>
+        <div id="secondary-metrics" class="metrics"></div>
+        <div id="updated" class="updated"></div>
       </section>
     </div>
   `;
 }
 
-function emptyHtml(total, maxDistanceKm) {
-  return `
-    <div class="plane-count">${total ?? 0} planes</div>
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
 
-    <section class="plane-info empty">
-      <div class="flight">No aircraft</div>
-      <div class="metrics">Nothing within ${maxDistanceKm ?? 10} km</div>
-    </section>
-  `;
+function showNoAircraft(total, maxDistanceKm) {
+  ensureHud();
+
+  setText("plane-count", `${total ?? 0} planes`);
+  setText("calibration-readout", "");
+  setText("flight", "No aircraft");
+  setText("aircraft-type", "");
+  setText("primary-metrics", `Nothing within ${maxDistanceKm ?? 10} km`);
+  setText("secondary-metrics", "");
+  setText("updated", "");
+
+  const orbit = document.getElementById("arrow-orbit");
+  if (orbit) {
+    orbit.classList.add("hidden");
+  }
+}
+
+function showError(message) {
+  ensureHud();
+
+  setText("plane-count", "");
+  setText("calibration-readout", "");
+  setText("flight", "Error");
+  setText("aircraft-type", "");
+  setText("primary-metrics", message);
+  setText("secondary-metrics", "");
+  setText("updated", "");
+
+  const orbit = document.getElementById("arrow-orbit");
+  if (orbit) {
+    orbit.classList.add("hidden");
+  }
+}
+
+function showPlane(plane, total) {
+  ensureHud();
+
+  const uiAngle = plane.uiAngleDeg ?? 90;
+
+  setText("plane-count", `${total ?? 0} planes`);
+  setText(
+    "calibration-readout",
+    `${formatBearing(plane.bearingFromHomeDeg)} · ${formatElevation(plane.elevationAngleDeg)}`
+  );
+
+  setText("flight", plane.displayName || "UNKNOWN");
+  setText("aircraft-type", plane.aircraftType || "aircraft type unknown");
+
+  setText(
+    "primary-metrics",
+    `${formatDistance(plane.distanceKm)} · ${formatAltitude(plane.altitudeFt)}`
+  );
+
+  setText(
+    "secondary-metrics",
+    `${formatSpeedKmh(plane.groundSpeedKmh)} · ${formatVerticalRate(plane.verticalRateFpm)}`
+  );
+
+  setText("updated", formatUpdated(plane.seenSec));
+
+  const orbit = document.getElementById("arrow-orbit");
+  if (orbit) {
+    orbit.classList.remove("hidden");
+    orbit.style.setProperty("--arrow-angle", `${uiAngle}deg`);
+  }
 }
 
 async function refresh() {
   try {
-    const res = await fetch("/api/aircraft");
+    const res = await fetch("/api/aircraft", { cache: "no-store" });
     const data = await res.json();
 
     if (!res.ok) {
@@ -122,21 +151,17 @@ async function refresh() {
     statusEl.textContent = "";
 
     if (!data.selected) {
-      aircraftEl.innerHTML = emptyHtml(data.total, data.maxDistanceKm);
+      showNoAircraft(data.total, data.maxDistanceKm);
       return;
     }
 
-    aircraftEl.innerHTML = planeHtml(data.selected, data.total ?? 0);
+    showPlane(data.selected, data.total);
   } catch (err) {
     statusEl.textContent = "";
-    aircraftEl.innerHTML = `
-      <section class="plane-info empty">
-        <div class="flight">Error</div>
-        <div class="metrics">${String(err.message || err)}</div>
-      </section>
-    `;
+    showError(String(err.message || err));
   }
 }
 
+ensureHud();
 refresh();
 setInterval(refresh, 500);
