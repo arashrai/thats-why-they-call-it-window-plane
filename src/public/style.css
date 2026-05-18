@@ -37,9 +37,21 @@ main {
   position: absolute;
   top: 4vh;
   right: 5vw;
-  font-size: clamp(18px, 2.2vw, 42px);
+  z-index: 5;
+  font-size: clamp(22px, 2.5vw, 48px);
   line-height: 1;
-  opacity: 0.58;
+  opacity: 0.62;
+  letter-spacing: 0.02em;
+}
+
+.calibration-readout {
+  position: absolute;
+  top: 4vh;
+  left: 5vw;
+  z-index: 5;
+  font-size: clamp(22px, 2.5vw, 48px);
+  line-height: 1;
+  opacity: 0.62;
   letter-spacing: 0.02em;
 }
 
@@ -52,7 +64,7 @@ main {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: min(88vw, 1500px);
+  width: min(82vw, 1400px);
   transform: translate(-50%, -50%);
   text-align: center;
   z-index: 2;
@@ -100,17 +112,10 @@ main {
   opacity: 0.62;
 }
 
-.debug-line {
-  margin-top: 3vh;
-  font-size: clamp(18px, 2.1vw, 42px);
-  line-height: 1.1;
-  opacity: 0.42;
-}
-
 .look-arrow {
   position: absolute;
-  width: clamp(90px, 13vw, 250px);
-  height: clamp(45px, 6.5vw, 125px);
+  width: clamp(80px, 11vw, 220px);
+  height: clamp(40px, 5.5vw, 110px);
   z-index: 1;
   opacity: 0.92;
   transition:
@@ -137,6 +142,10 @@ main {
 }
 
 @media (max-width: 900px) {
+  .plane-info {
+    width: 86vw;
+  }
+
   .flight {
     font-size: 12vw;
   }

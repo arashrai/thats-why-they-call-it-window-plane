@@ -14,7 +14,7 @@ const HOME = {
   lat: Number(process.env.HOME_LAT),
   lon: Number(process.env.HOME_LON),
   elevationFt: Number(process.env.HOME_ELEVATION_FT || 350),
-  maxDistanceNm: Number(process.env.MAX_DISTANCE_NM || 30),
+  maxDistanceKm: Number(process.env.MAX_DISTANCE_KM || 10),
   minElevationAngleDeg: Number(process.env.MIN_ELEVATION_ANGLE_DEG || 0),
   maxElevationAngleDeg: Number(process.env.MAX_ELEVATION_ANGLE_DEG || 85),
   downBearingDeg: Number(process.env.DOWN_BEARING_DEG || 120),
@@ -163,16 +163,6 @@ function formatFlightName(callsign) {
   return `${airline} ${number}`;
 }
 
-function getAircraftType(a) {
-  if (a.desc) return normalizeAircraftDescription(a.desc);
-  if (a.typeDescription) return normalizeAircraftDescription(a.typeDescription);
-
-  const typeCode = a.t || a.type || null;
-  if (!typeCode) return null;
-
-  return AIRCRAFT_TYPES[typeCode] || typeCode;
-}
-
 function normalizeAircraftDescription(desc) {
   if (!desc) return null;
 
@@ -186,6 +176,16 @@ function normalizeAircraftDescription(desc) {
     .trim();
 }
 
+function getAircraftType(a) {
+  if (a.desc) return normalizeAircraftDescription(a.desc);
+  if (a.typeDescription) return normalizeAircraftDescription(a.typeDescription);
+
+  const typeCode = a.t || a.type || null;
+  if (!typeCode) return null;
+
+  return AIRCRAFT_TYPES[typeCode] || typeCode;
+}
+
 function bearingToUiAngleDeg(bearingFromHomeDeg) {
   if (bearingFromHomeDeg == null) return 90;
 
@@ -194,7 +194,7 @@ function bearingToUiAngleDeg(bearingFromHomeDeg) {
     HOME.downBearingDeg
   );
 
-  // Screen coordinate convention:
+  // Screen convention:
   // 0° = right, 90° = down, 180° = left, 270° = up.
   //
   // If DOWN_BEARING_DEG is 120:
@@ -204,36 +204,17 @@ function bearingToUiAngleDeg(bearingFromHomeDeg) {
   return normalizeDeg(90 + diffFromDown * HOME.bearingToUiScale);
 }
 
-function isUsableAircraft(a) {
+function isSelectableAircraft(a) {
   return (
     a.lat != null &&
     a.lon != null &&
-    a.distanceNm != null &&
+    a.distanceKm != null &&
     a.elevationAngleDeg != null &&
     (a.seenSec ?? 999) < 10 &&
-    a.distanceNm <= HOME.maxDistanceNm &&
+    a.distanceKm <= HOME.maxDistanceKm &&
     a.elevationAngleDeg >= HOME.minElevationAngleDeg &&
     a.elevationAngleDeg <= HOME.maxElevationAngleDeg
   );
-}
-
-function scoreAircraft(a) {
-  if (!isUsableAircraft(a)) return -Infinity;
-
-  const distanceScore = 1 - Math.min(a.distanceNm / HOME.maxDistanceNm, 1);
-
-  const freshnessScore =
-    a.seenSec == null
-      ? 0.5
-      : Math.max(0, Math.min(1, 1 - a.seenSec / 10));
-
-  const altitudeScore =
-    typeof a.altitudeFt === "number"
-      ? 1 - Math.min(Math.max(a.altitudeFt - 1000, 0) / 35000, 1)
-      : 0.3;
-
-  // No window visibility logic here. Just prefer nearby, fresh, visually plausible aircraft.
-  return 0.5 * distanceScore + 0.35 * freshnessScore + 0.15 * altitudeScore;
 }
 
 function enrichAircraft(a) {
@@ -257,6 +238,8 @@ function enrichAircraft(a) {
     ? haversineNm(HOME.lat, HOME.lon, lat, lon)
     : null;
 
+  const distanceKm = distanceNm == null ? null : distanceNm * 1.852;
+
   const bearingFromHomeDeg = hasHome
     ? bearingDeg(HOME.lat, HOME.lon, lat, lon)
     : null;
@@ -277,13 +260,13 @@ function enrichAircraft(a) {
     verticalRateFpm: a.baro_rate ?? a.geom_rate ?? null,
     seenSec: a.seen ?? null,
     distanceNm,
+    distanceKm,
     bearingFromHomeDeg,
     elevationAngleDeg: elev,
     uiAngleDeg: bearingToUiAngleDeg(bearingFromHomeDeg)
   };
 
-  enriched.isUsable = isUsableAircraft(enriched);
-  enriched.visibilityScore = scoreAircraft(enriched);
+  enriched.isSelectable = isSelectableAircraft(enriched);
 
   return enriched;
 }
@@ -296,16 +279,21 @@ app.get("/api/aircraft", async (_req, res) => {
     const aircraft = (data.aircraft || [])
       .filter((a) => a.flight || a.lat || a.lon || a.alt_baro || a.alt_geom)
       .map(enrichAircraft)
-      .sort((a, b) => b.visibilityScore - a.visibilityScore);
+      .sort((a, b) => {
+        if (a.isSelectable && !b.isSelectable) return -1;
+        if (!a.isSelectable && b.isSelectable) return 1;
 
-    const selected =
-      aircraft.find((a) => a.isUsable) ||
-      aircraft.find((a) => (a.seenSec ?? 999) < 10) ||
-      null;
+        const aDistance = a.distanceKm ?? Infinity;
+        const bDistance = b.distanceKm ?? Infinity;
+        return aDistance - bDistance;
+      });
+
+    const selected = aircraft.find((a) => a.isSelectable) || null;
 
     res.json({
       now: data.now,
       total: data.aircraft?.length ?? 0,
+      maxDistanceKm: HOME.maxDistanceKm,
       selected,
       aircraft
     });
