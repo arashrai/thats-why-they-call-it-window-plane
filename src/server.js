@@ -14,11 +14,15 @@ const HOME = {
   lat: Number(process.env.HOME_LAT),
   lon: Number(process.env.HOME_LON),
   elevationFt: Number(process.env.HOME_ELEVATION_FT || 350),
-  windowCenterAzimuthDeg: Number(process.env.WINDOW_CENTER_AZIMUTH_DEG || 45),
-  windowHalfWidthDeg: Number(process.env.WINDOW_HALF_WIDTH_DEG || 55),
+  windowCenterAzimuthDeg: Number(process.env.WINDOW_CENTER_AZIMUTH_DEG || 160),
+  windowHalfWidthDeg: Number(process.env.WINDOW_HALF_WIDTH_DEG || 65),
   maxDistanceNm: Number(process.env.MAX_DISTANCE_NM || 25),
   minElevationAngleDeg: Number(process.env.MIN_ELEVATION_ANGLE_DEG || 1),
-  maxElevationAngleDeg: Number(process.env.MAX_ELEVATION_ANGLE_DEG || 75)
+  maxElevationAngleDeg: Number(process.env.MAX_ELEVATION_ANGLE_DEG || 75),
+  frontBearingDeg: Number(process.env.FRONT_BEARING_DEG || 120),
+  rightBearingDeg: Number(process.env.RIGHT_BEARING_DEG || 200),
+  frontUiAngleDeg: Number(process.env.FRONT_UI_ANGLE_DEG || 90),
+  rightUiAngleDeg: Number(process.env.RIGHT_UI_ANGLE_DEG || 0)
 };
 
 const AIRLINES = {
@@ -51,6 +55,36 @@ const AIRLINES = {
   HAL: "Hawaiian"
 };
 
+const AIRCRAFT_TYPES = {
+  E75L: "Embraer E175",
+  E75S: "Embraer E175",
+  B739: "Boeing 737-900",
+  B738: "Boeing 737-800",
+  B737: "Boeing 737",
+  B38M: "Boeing 737 MAX 8",
+  B39M: "Boeing 737 MAX 9",
+  A319: "Airbus A319",
+  A320: "Airbus A320",
+  A321: "Airbus A321",
+  A20N: "Airbus A320neo",
+  A21N: "Airbus A321neo",
+  B752: "Boeing 757-200",
+  B763: "Boeing 767-300",
+  B772: "Boeing 777-200",
+  B77W: "Boeing 777-300ER",
+  B788: "Boeing 787-8",
+  B789: "Boeing 787-9",
+  B78X: "Boeing 787-10",
+  C172: "Cessna 172",
+  C208: "Cessna 208",
+  PC12: "Pilatus PC-12",
+  GLF4: "Gulfstream IV",
+  GLF5: "Gulfstream V",
+  GLF6: "Gulfstream G650",
+  CL35: "Challenger 350",
+  CL60: "Challenger 600"
+};
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -71,6 +105,10 @@ function normalizeDeg(deg) {
 function angularDiffDeg(a, b) {
   const diff = Math.abs(normalizeDeg(a) - normalizeDeg(b));
   return Math.min(diff, 360 - diff);
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function haversineNm(lat1, lon1, lat2, lon2) {
@@ -103,10 +141,8 @@ function bearingDeg(lat1, lon1, lat2, lon2) {
 
 function elevationAngleDeg(distanceNm, altitudeFt, homeElevationFt) {
   if (distanceNm == null || altitudeFt == null) return null;
-
   const groundDistanceFt = distanceNm * 6076.12;
   const altitudeAboveHomeFt = altitudeFt - homeElevationFt;
-
   return radToDeg(Math.atan2(altitudeAboveHomeFt, groundDistanceFt));
 }
 
@@ -131,6 +167,18 @@ function formatFlightName(callsign) {
   return `${airline} ${number}`;
 }
 
+function getAircraftType(a) {
+  // readsb/tar1090 fields can vary depending on aircraft database setup.
+  // Prefer a description if present; otherwise map type designator.
+  if (a.desc) return a.desc;
+  if (a.typeDescription) return a.typeDescription;
+
+  const typeCode = a.t || a.type || null;
+  if (!typeCode) return null;
+
+  return AIRCRAFT_TYPES[typeCode] || typeCode;
+}
+
 function isWithinWindow(aircraft) {
   if (
     aircraft.bearingFromHomeDeg == null ||
@@ -153,6 +201,20 @@ function isWithinWindow(aircraft) {
   );
 }
 
+function bearingToUiAngleDeg(bearing) {
+  if (bearing == null) return HOME.frontUiAngleDeg;
+
+  const startBearing = HOME.frontBearingDeg;
+  const endBearing = HOME.rightBearingDeg;
+  const startUi = HOME.frontUiAngleDeg;
+  const endUi = HOME.rightUiAngleDeg;
+
+  const clampedBearing = clamp(bearing, startBearing, endBearing);
+  const t = (clampedBearing - startBearing) / (endBearing - startBearing);
+
+  return startUi + t * (endUi - startUi);
+}
+
 function scoreAircraft(aircraft) {
   if (!aircraft.isWithinWindow) return -Infinity;
 
@@ -163,10 +225,6 @@ function scoreAircraft(aircraft) {
 
   const azimuthScore = 1 - azimuthDiff / HOME.windowHalfWidthDeg;
   const distanceScore = 1 - Math.min(aircraft.distanceNm / HOME.maxDistanceNm, 1);
-
-  // readsb RSSI is negative; closer to 0 is stronger.
-  const rssi = typeof aircraft.rssi === "number" ? aircraft.rssi : -50;
-  const rssiScore = Math.max(0, Math.min(1, (rssi + 50) / 50));
 
   const freshnessScore =
     aircraft.seenSec == null
@@ -179,11 +237,10 @@ function scoreAircraft(aircraft) {
       : 0.3;
 
   return (
-    0.35 * azimuthScore +
+    0.45 * azimuthScore +
     0.25 * distanceScore +
-    0.2 * rssiScore +
-    0.15 * freshnessScore +
-    0.05 * altitudeScore
+    0.2 * freshnessScore +
+    0.1 * altitudeScore
   );
 }
 
@@ -218,6 +275,7 @@ function enrichAircraft(a) {
     hex: a.hex,
     callsign: a.flight?.trim() || null,
     displayName: formatFlightName(a.flight) || a.hex || "UNKNOWN",
+    aircraftType: getAircraftType(a),
     lat,
     lon,
     altitudeFt,
@@ -226,10 +284,10 @@ function enrichAircraft(a) {
     trackDeg: a.track ?? null,
     verticalRateFpm: a.baro_rate ?? a.geom_rate ?? null,
     seenSec: a.seen ?? null,
-    rssi: a.rssi ?? null,
     distanceNm,
     bearingFromHomeDeg,
-    elevationAngleDeg: elev
+    elevationAngleDeg: elev,
+    uiAngleDeg: bearingToUiAngleDeg(bearingFromHomeDeg)
   };
 
   enriched.isWithinWindow = isWithinWindow(enriched);
@@ -256,11 +314,6 @@ app.get("/api/aircraft", async (_req, res) => {
     res.json({
       now: data.now,
       total: data.aircraft?.length ?? 0,
-      home: {
-        windowCenterAzimuthDeg: HOME.windowCenterAzimuthDeg,
-        windowHalfWidthDeg: HOME.windowHalfWidthDeg,
-        maxDistanceNm: HOME.maxDistanceNm
-      },
       selected,
       aircraft
     });
