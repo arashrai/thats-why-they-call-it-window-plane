@@ -43,14 +43,14 @@ function ensureHud() {
 
   aircraftEl.innerHTML = `
     <div id="hud-root" class="hud-root">
-      <div id="plane-count" class="plane-count">0 planes</div>
       <div id="calibration-readout" class="calibration-readout"></div>
+      <div id="plane-count" class="plane-count"></div>
 
-      <div id="arrow-orbit" class="arrow-orbit" aria-hidden="true">
+      <div id="arrow-orbit" class="arrow-orbit hidden" aria-hidden="true">
         <div class="look-arrow">
           <svg viewBox="0 0 120 60" role="img">
-            <path d="M8 30 H92" class="arrow-line" />
-            <path d="M72 10 L102 30 L72 50" class="arrow-head" />
+            <path d="M8 30 H92" class="arrow-line"></path>
+            <path d="M72 10 L102 30 L72 50" class="arrow-head"></path>
           </svg>
         </div>
       </div>
@@ -58,7 +58,6 @@ function ensureHud() {
       <section id="plane-info" class="plane-info">
         <div id="flight" class="flight"></div>
         <div id="aircraft-type" class="aircraft-type"></div>
-
         <div id="primary-metrics" class="metrics primary-metrics"></div>
         <div id="secondary-metrics" class="metrics"></div>
         <div id="updated" class="updated"></div>
@@ -69,7 +68,19 @@ function ensureHud() {
 
 function setText(id, value) {
   const el = document.getElementById(id);
-  if (el) el.textContent = value;
+  if (el) el.textContent = value ?? "";
+}
+
+function setArrowVisible(visible) {
+  const orbit = document.getElementById("arrow-orbit");
+  if (!orbit) return;
+  orbit.classList.toggle("hidden", !visible);
+}
+
+function setArrowAngle(uiAngleDeg) {
+  const orbit = document.getElementById("arrow-orbit");
+  if (!orbit) return;
+  orbit.style.setProperty("--arrow-angle", `${uiAngleDeg ?? 90}deg`);
 }
 
 function showNoAircraft(total, maxDistanceKm) {
@@ -83,10 +94,7 @@ function showNoAircraft(total, maxDistanceKm) {
   setText("secondary-metrics", "");
   setText("updated", "");
 
-  const orbit = document.getElementById("arrow-orbit");
-  if (orbit) {
-    orbit.classList.add("hidden");
-  }
+  setArrowVisible(false);
 }
 
 function showError(message) {
@@ -100,21 +108,19 @@ function showError(message) {
   setText("secondary-metrics", "");
   setText("updated", "");
 
-  const orbit = document.getElementById("arrow-orbit");
-  if (orbit) {
-    orbit.classList.add("hidden");
-  }
+  setArrowVisible(false);
 }
 
 function showPlane(plane, total) {
   ensureHud();
 
-  const uiAngle = plane.uiAngleDeg ?? 90;
-
   setText("plane-count", `${total ?? 0} planes`);
+
   setText(
     "calibration-readout",
-    `${formatBearing(plane.bearingFromHomeDeg)} · ${formatElevation(plane.elevationAngleDeg)}`
+    `${formatBearing(plane.bearingFromHomeDeg)} · ${formatElevation(
+      plane.elevationAngleDeg
+    )}`
   );
 
   setText("flight", plane.displayName || "UNKNOWN");
@@ -127,21 +133,25 @@ function showPlane(plane, total) {
 
   setText(
     "secondary-metrics",
-    `${formatSpeedKmh(plane.groundSpeedKmh)} · ${formatVerticalRate(plane.verticalRateFpm)}`
+    `${formatSpeedKmh(plane.groundSpeedKmh)} · ${formatVerticalRate(
+      plane.verticalRateFpm
+    )}`
   );
 
   setText("updated", formatUpdated(plane.seenSec));
 
-  const orbit = document.getElementById("arrow-orbit");
-  if (orbit) {
-    orbit.classList.remove("hidden");
-    orbit.style.setProperty("--arrow-angle", `${uiAngle}deg`);
-  }
+  setArrowAngle(plane.uiAngleDeg);
+  setArrowVisible(true);
 }
 
 async function refresh() {
   try {
-    const res = await fetch("/api/aircraft", { cache: "no-store" });
+    ensureHud();
+
+    const res = await fetch(`/api/aircraft?t=${Date.now()}`, {
+      cache: "no-store"
+    });
+
     const data = await res.json();
 
     if (!res.ok) {

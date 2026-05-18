@@ -37,13 +37,14 @@ main {
   position: absolute;
   inset: 0;
   overflow: hidden;
+  background: #000;
 }
 
 .plane-count {
   position: absolute;
   top: 4vh;
   right: 5vw;
-  z-index: 5;
+  z-index: 10;
   font-size: clamp(22px, 2.5vw, 48px);
   line-height: 1;
   opacity: 0.62;
@@ -54,7 +55,7 @@ main {
   position: absolute;
   top: 4vh;
   left: 5vw;
-  z-index: 5;
+  z-index: 10;
   font-size: clamp(22px, 2.5vw, 48px);
   line-height: 1;
   opacity: 0.62;
@@ -65,10 +66,10 @@ main {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: min(82vw, 1400px);
+  width: min(80vw, 1350px);
   transform: translate(-50%, -50%);
   text-align: center;
-  z-index: 2;
+  z-index: 5;
 }
 
 .flight {
@@ -110,10 +111,9 @@ main {
 }
 
 /*
-  The orbit is fixed at the exact center of the HUD/text.
-  It rotates as a whole. The arrow is placed at a fixed radius on that orbit.
+  Fixed circular orbit around the centered text.
 
-  CSS angle convention here:
+  CSS/screen convention:
   0deg   = right
   90deg  = down
   180deg = left
@@ -121,20 +121,20 @@ main {
 */
 .arrow-orbit {
   --arrow-angle: 90deg;
-  --orbit-radius: min(41vh, 41vw);
+  --orbit-radius: min(43vh, 43vw);
 
   position: absolute;
   left: 50%;
   top: 50%;
   width: 0;
   height: 0;
-  z-index: 3;
+  z-index: 4;
+  opacity: 0.92;
   transform: rotate(var(--arrow-angle));
   transform-origin: center;
   transition:
     transform 500ms linear,
-    opacity 250ms ease;
-  opacity: 0.92;
+    opacity 200ms ease;
   pointer-events: none;
   will-change: transform;
 }
@@ -151,16 +151,16 @@ main {
   height: clamp(40px, 5.5vw, 110px);
 
   /*
-    Move the arrow outward along the rotated orbit's local +X axis.
-    Because the parent rotates, this becomes a true circular orbit.
+    Move outward along the orbit's local +X axis.
+    Parent rotation creates the circular orbit.
   */
   transform: translateX(var(--orbit-radius)) translate(-50%, -50%);
-  filter: drop-shadow(0 0 18px rgba(255, 255, 255, 0.45));
 }
 
 .look-arrow svg {
   width: 100%;
   height: 100%;
+  display: block;
   overflow: visible;
 }
 
@@ -191,6 +191,6 @@ main {
   }
 
   .arrow-orbit {
-    --orbit-radius: min(38vh, 38vw);
+    --orbit-radius: min(39vh, 39vw);
   }
 }
