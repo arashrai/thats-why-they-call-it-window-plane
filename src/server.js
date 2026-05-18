@@ -14,15 +14,11 @@ const HOME = {
   lat: Number(process.env.HOME_LAT),
   lon: Number(process.env.HOME_LON),
   elevationFt: Number(process.env.HOME_ELEVATION_FT || 350),
-  windowCenterAzimuthDeg: Number(process.env.WINDOW_CENTER_AZIMUTH_DEG || 160),
-  windowHalfWidthDeg: Number(process.env.WINDOW_HALF_WIDTH_DEG || 65),
-  maxDistanceNm: Number(process.env.MAX_DISTANCE_NM || 25),
-  minElevationAngleDeg: Number(process.env.MIN_ELEVATION_ANGLE_DEG || 1),
-  maxElevationAngleDeg: Number(process.env.MAX_ELEVATION_ANGLE_DEG || 75),
-  frontBearingDeg: Number(process.env.FRONT_BEARING_DEG || 120),
-  rightBearingDeg: Number(process.env.RIGHT_BEARING_DEG || 200),
-  frontUiAngleDeg: Number(process.env.FRONT_UI_ANGLE_DEG || 90),
-  rightUiAngleDeg: Number(process.env.RIGHT_UI_ANGLE_DEG || 0)
+  maxDistanceNm: Number(process.env.MAX_DISTANCE_NM || 30),
+  minElevationAngleDeg: Number(process.env.MIN_ELEVATION_ANGLE_DEG || 0),
+  maxElevationAngleDeg: Number(process.env.MAX_ELEVATION_ANGLE_DEG || 85),
+  downBearingDeg: Number(process.env.DOWN_BEARING_DEG || 120),
+  bearingToUiScale: Number(process.env.BEARING_TO_UI_SCALE || 1)
 };
 
 const AIRLINES = {
@@ -58,6 +54,8 @@ const AIRLINES = {
 const AIRCRAFT_TYPES = {
   E75L: "Embraer E175",
   E75S: "Embraer E175",
+  E170: "Embraer E170",
+  E190: "Embraer E190",
   B739: "Boeing 737-900",
   B738: "Boeing 737-800",
   B737: "Boeing 737",
@@ -69,6 +67,7 @@ const AIRCRAFT_TYPES = {
   A20N: "Airbus A320neo",
   A21N: "Airbus A321neo",
   B752: "Boeing 757-200",
+  B753: "Boeing 757-300",
   B763: "Boeing 767-300",
   B772: "Boeing 777-200",
   B77W: "Boeing 777-300ER",
@@ -102,13 +101,8 @@ function normalizeDeg(deg) {
   return ((deg % 360) + 360) % 360;
 }
 
-function angularDiffDeg(a, b) {
-  const diff = Math.abs(normalizeDeg(a) - normalizeDeg(b));
-  return Math.min(diff, 360 - diff);
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
+function signedAngularDiffDeg(angle, reference) {
+  return ((((angle - reference) % 360) + 540) % 360) - 180;
 }
 
 function haversineNm(lat1, lon1, lat2, lon2) {
@@ -141,8 +135,10 @@ function bearingDeg(lat1, lon1, lat2, lon2) {
 
 function elevationAngleDeg(distanceNm, altitudeFt, homeElevationFt) {
   if (distanceNm == null || altitudeFt == null) return null;
+
   const groundDistanceFt = distanceNm * 6076.12;
   const altitudeAboveHomeFt = altitudeFt - homeElevationFt;
+
   return radToDeg(Math.atan2(altitudeAboveHomeFt, groundDistanceFt));
 }
 
@@ -168,10 +164,8 @@ function formatFlightName(callsign) {
 }
 
 function getAircraftType(a) {
-  // readsb/tar1090 fields can vary depending on aircraft database setup.
-  // Prefer a description if present; otherwise map type designator.
-  if (a.desc) return a.desc;
-  if (a.typeDescription) return a.typeDescription;
+  if (a.desc) return normalizeAircraftDescription(a.desc);
+  if (a.typeDescription) return normalizeAircraftDescription(a.typeDescription);
 
   const typeCode = a.t || a.type || null;
   if (!typeCode) return null;
@@ -179,69 +173,67 @@ function getAircraftType(a) {
   return AIRCRAFT_TYPES[typeCode] || typeCode;
 }
 
-function isWithinWindow(aircraft) {
-  if (
-    aircraft.bearingFromHomeDeg == null ||
-    aircraft.elevationAngleDeg == null ||
-    aircraft.distanceNm == null
-  ) {
-    return false;
-  }
+function normalizeAircraftDescription(desc) {
+  if (!desc) return null;
 
-  const azimuthDiff = angularDiffDeg(
-    aircraft.bearingFromHomeDeg,
-    HOME.windowCenterAzimuthDeg
+  return String(desc)
+    .replace(/\s+/g, " ")
+    .replace(/^BOEING\s+/i, "Boeing ")
+    .replace(/^AIRBUS\s+/i, "Airbus ")
+    .replace(/^EMBRAER\s+/i, "Embraer ")
+    .replace(/^BOMBARDIER\s+/i, "Bombardier ")
+    .replace(/^CESSNA\s+/i, "Cessna ")
+    .trim();
+}
+
+function bearingToUiAngleDeg(bearingFromHomeDeg) {
+  if (bearingFromHomeDeg == null) return 90;
+
+  const diffFromDown = signedAngularDiffDeg(
+    bearingFromHomeDeg,
+    HOME.downBearingDeg
   );
 
+  // Screen coordinate convention:
+  // 0° = right, 90° = down, 180° = left, 270° = up.
+  //
+  // If DOWN_BEARING_DEG is 120:
+  // bearing 120 -> 90°  -> down
+  // bearing 130 -> 100° -> down-left
+  // bearing 110 -> 80°  -> down-right
+  return normalizeDeg(90 + diffFromDown * HOME.bearingToUiScale);
+}
+
+function isUsableAircraft(a) {
   return (
-    azimuthDiff <= HOME.windowHalfWidthDeg &&
-    aircraft.distanceNm <= HOME.maxDistanceNm &&
-    aircraft.elevationAngleDeg >= HOME.minElevationAngleDeg &&
-    aircraft.elevationAngleDeg <= HOME.maxElevationAngleDeg
+    a.lat != null &&
+    a.lon != null &&
+    a.distanceNm != null &&
+    a.elevationAngleDeg != null &&
+    (a.seenSec ?? 999) < 10 &&
+    a.distanceNm <= HOME.maxDistanceNm &&
+    a.elevationAngleDeg >= HOME.minElevationAngleDeg &&
+    a.elevationAngleDeg <= HOME.maxElevationAngleDeg
   );
 }
 
-function bearingToUiAngleDeg(bearing) {
-  if (bearing == null) return HOME.frontUiAngleDeg;
+function scoreAircraft(a) {
+  if (!isUsableAircraft(a)) return -Infinity;
 
-  const startBearing = HOME.frontBearingDeg;
-  const endBearing = HOME.rightBearingDeg;
-  const startUi = HOME.frontUiAngleDeg;
-  const endUi = HOME.rightUiAngleDeg;
-
-  const clampedBearing = clamp(bearing, startBearing, endBearing);
-  const t = (clampedBearing - startBearing) / (endBearing - startBearing);
-
-  return startUi + t * (endUi - startUi);
-}
-
-function scoreAircraft(aircraft) {
-  if (!aircraft.isWithinWindow) return -Infinity;
-
-  const azimuthDiff = angularDiffDeg(
-    aircraft.bearingFromHomeDeg,
-    HOME.windowCenterAzimuthDeg
-  );
-
-  const azimuthScore = 1 - azimuthDiff / HOME.windowHalfWidthDeg;
-  const distanceScore = 1 - Math.min(aircraft.distanceNm / HOME.maxDistanceNm, 1);
+  const distanceScore = 1 - Math.min(a.distanceNm / HOME.maxDistanceNm, 1);
 
   const freshnessScore =
-    aircraft.seenSec == null
+    a.seenSec == null
       ? 0.5
-      : Math.max(0, Math.min(1, 1 - aircraft.seenSec / 10));
+      : Math.max(0, Math.min(1, 1 - a.seenSec / 10));
 
   const altitudeScore =
-    typeof aircraft.altitudeFt === "number"
-      ? 1 - Math.min(Math.max(aircraft.altitudeFt - 1000, 0) / 35000, 1)
+    typeof a.altitudeFt === "number"
+      ? 1 - Math.min(Math.max(a.altitudeFt - 1000, 0) / 35000, 1)
       : 0.3;
 
-  return (
-    0.45 * azimuthScore +
-    0.25 * distanceScore +
-    0.2 * freshnessScore +
-    0.1 * altitudeScore
-  );
+  // No window visibility logic here. Just prefer nearby, fresh, visually plausible aircraft.
+  return 0.5 * distanceScore + 0.35 * freshnessScore + 0.15 * altitudeScore;
 }
 
 function enrichAircraft(a) {
@@ -290,7 +282,7 @@ function enrichAircraft(a) {
     uiAngleDeg: bearingToUiAngleDeg(bearingFromHomeDeg)
   };
 
-  enriched.isWithinWindow = isWithinWindow(enriched);
+  enriched.isUsable = isUsableAircraft(enriched);
   enriched.visibilityScore = scoreAircraft(enriched);
 
   return enriched;
@@ -307,7 +299,7 @@ app.get("/api/aircraft", async (_req, res) => {
       .sort((a, b) => b.visibilityScore - a.visibilityScore);
 
     const selected =
-      aircraft.find((a) => a.isWithinWindow && (a.seenSec ?? 999) < 10) ||
+      aircraft.find((a) => a.isUsable) ||
       aircraft.find((a) => (a.seenSec ?? 999) < 10) ||
       null;
 
@@ -327,6 +319,6 @@ app.get("/api/aircraft", async (_req, res) => {
 });
 
 app.listen(port, "0.0.0.0", () => {
-  console.log(`Aircraft HUD running at http://0.0.0.0:${port}`);
+  console.log(`Window Plane running at http://0.0.0.0:${port}`);
   console.log(`Reading aircraft from ${aircraftJsonPath}`);
 });
