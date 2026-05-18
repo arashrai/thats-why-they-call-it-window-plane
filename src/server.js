@@ -327,6 +327,6 @@ app.get("/api/aircraft", async (_req, res) => {
 });
 
 app.listen(port, "0.0.0.0", () => {
-  console.log(`Window Plane running at http://0.0.0.0:${port}`);
+  console.log(`Aircraft HUD running at http://0.0.0.0:${port}`);
   console.log(`Reading aircraft from ${aircraftJsonPath}`);
 });

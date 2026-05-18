@@ -1,0 +1,28 @@
+{
+  "now": 1710000000.5,
+  "aircraft": [
+    {
+      "hex": "a1b2c3",
+      "flight": "DAL1432 ",
+      "t": "B739",
+      "desc": "Boeing 737-900",
+      "lat": 47.42,
+      "lon": -122.18,
+      "alt_baro": 6475,
+      "gs": 272,
+      "baro_rate": 640,
+      "seen": 0.2
+    },
+    {
+      "hex": "d4e5f6",
+      "flight": "ASA611 ",
+      "t": "B738",
+      "lat": 47.38,
+      "lon": -122.12,
+      "alt_baro": 12000,
+      "gs": 310,
+      "baro_rate": -200,
+      "seen": 0.8
+    }
+  ]
+}

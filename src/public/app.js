@@ -1,5 +1,17 @@
+const planeCountEl = document.getElementById("plane-count");
+const hudOrbitEl = document.getElementById("hud-orbit");
+const lookArrowEl = document.getElementById("look-arrow");
+const planeInfoEl = document.getElementById("plane-info");
+const flightEl = document.getElementById("flight");
+const aircraftTypeEl = document.getElementById("aircraft-type");
+const metricsPrimaryEl = document.getElementById("metrics-primary");
+const metricsSecondaryEl = document.getElementById("metrics-secondary");
+const updatedEl = document.getElementById("updated");
+const debugCornerEl = document.getElementById("debug-corner");
 const statusEl = document.getElementById("status");
-const aircraftEl = document.getElementById("aircraft");
+
+let selectedPlane = null;
+let arrowVisible = false;
 
 function formatAltitude(alt) {
   if (alt == null) return "altitude unknown";
@@ -39,79 +51,69 @@ function formatVerticalRate(fpm) {
   return fpm > 0 ? "climbing" : "descending";
 }
 
-function arrowPosition(uiAngleDeg) {
-  // CSS/screen convention:
-  // 0deg = right, 90deg = down, 180deg = left, 270deg = up.
+function setArrowVisible(visible) {
+  arrowVisible = visible;
+  lookArrowEl.classList.toggle("is-hidden", !visible);
+}
+
+function positionLookArrow(uiAngleDeg) {
+  if (!arrowVisible || uiAngleDeg == null) return;
+
+  const orbitRect = hudOrbitEl.getBoundingClientRect();
+  const infoRect = planeInfoEl.getBoundingClientRect();
+
+  const pad = Math.min(window.innerWidth, window.innerHeight) * 0.07;
+  const radiusX = infoRect.width / 2 + pad;
+  const radiusY = infoRect.height / 2 + pad;
+
   const angleRad = (uiAngleDeg * Math.PI) / 180;
+  const cx = orbitRect.width / 2;
+  const cy = orbitRect.height / 2;
+  const x = cx + Math.cos(angleRad) * radiusX;
+  const y = cy + Math.sin(angleRad) * radiusY;
 
-  // Radius as viewport-relative percentage around centered text.
-  // Keep this moderate so the arrow does not steal text space.
-  const radiusX = 24;
-  const radiusY = 24;
-
-  return {
-    left: 50 + Math.cos(angleRad) * radiusX,
-    top: 50 + Math.sin(angleRad) * radiusY
-  };
+  lookArrowEl.style.left = `${x}px`;
+  lookArrowEl.style.top = `${y}px`;
+  lookArrowEl.style.transform = `translate(-50%, -50%) rotate(${uiAngleDeg}deg)`;
 }
 
-function arrowRotation(uiAngleDeg) {
-  // SVG arrow points right by default, so rotate directly by uiAngleDeg.
-  return uiAngleDeg;
+function renderEmpty(message, total) {
+  selectedPlane = null;
+  setArrowVisible(false);
+
+  planeCountEl.textContent = total != null ? `${total} planes` : "";
+  flightEl.textContent = message;
+  aircraftTypeEl.textContent = "";
+  metricsPrimaryEl.textContent = "";
+  metricsSecondaryEl.textContent = "";
+  updatedEl.textContent = "";
+  debugCornerEl.textContent = "";
 }
 
-function planeHtml(plane, total) {
-  const uiAngle = plane.uiAngleDeg ?? 90;
-  const pos = arrowPosition(uiAngle);
-  const rotation = arrowRotation(uiAngle);
+function renderPlane(plane, total) {
+  selectedPlane = plane;
 
-  return `
-    <div class="plane-count">${total} planes</div>
+  planeCountEl.textContent = `${total} planes`;
+  flightEl.textContent = plane.displayName;
+  aircraftTypeEl.textContent = plane.aircraftType || "aircraft type unknown";
+  metricsPrimaryEl.textContent = `${formatDistance(plane.distanceNm)} · ${formatAltitude(plane.altitudeFt)}`;
+  metricsSecondaryEl.textContent = `${formatSpeedKmh(plane.groundSpeedKmh)} · ${formatVerticalRate(plane.verticalRateFpm)}`;
+  updatedEl.textContent = formatUpdated(plane.seenSec);
+  debugCornerEl.textContent = `${formatBearing(plane.bearingFromHomeDeg)} · ${formatElevation(plane.elevationAngleDeg)}`;
 
-    <div class="hud-orbit">
-      <div
-        class="look-arrow"
-        style="
-          left: ${pos.left}%;
-          top: ${pos.top}%;
-          transform: translate(-50%, -50%) rotate(${rotation}deg);
-        "
-        aria-hidden="true"
-      >
-        <svg viewBox="0 0 120 60" role="img">
-          <path
-            d="M8 30 H92"
-            class="arrow-line"
-          />
-          <path
-            d="M72 10 L102 30 L72 50"
-            class="arrow-head"
-          />
-        </svg>
-      </div>
+  if (plane.uiAngleDeg != null) {
+    setArrowVisible(true);
+    positionLookArrow(plane.uiAngleDeg);
+  } else {
+    setArrowVisible(false);
+  }
+}
 
-      <section class="plane-info">
-        <div class="flight">${plane.displayName}</div>
-        <div class="aircraft-type">${plane.aircraftType || "aircraft type unknown"}</div>
-
-        <div class="metrics primary-metrics">
-          ${formatDistance(plane.distanceNm)} · ${formatAltitude(plane.altitudeFt)}
-        </div>
-
-        <div class="metrics">
-          ${formatSpeedKmh(plane.groundSpeedKmh)} · ${formatVerticalRate(plane.verticalRateFpm)}
-        </div>
-
-        <div class="updated">
-          ${formatUpdated(plane.seenSec)}
-        </div>
-
-        <div class="debug-line">
-          ${formatBearing(plane.bearingFromHomeDeg)} · ${formatElevation(plane.elevationAngleDeg)}
-        </div>
-      </section>
-    </div>
-  `;
+function renderError(message) {
+  statusEl.hidden = false;
+  statusEl.textContent = message;
+  renderEmpty("Error", null);
+  aircraftTypeEl.textContent = message;
 }
 
 async function refresh() {
@@ -123,30 +125,31 @@ async function refresh() {
       throw new Error(data.details || data.error || "Unknown error");
     }
 
+    statusEl.hidden = true;
     statusEl.textContent = "";
 
     if (!data.selected) {
-      aircraftEl.innerHTML = `
-        <div class="plane-count">${data.total ?? 0} planes</div>
-        <section class="plane-info empty">
-          <div class="flight">No aircraft</div>
-          <div class="metrics">Waiting for ADS-B messages...</div>
-        </section>
-      `;
+      renderEmpty("No aircraft", data.total ?? 0);
+      metricsSecondaryEl.textContent = "Waiting for ADS-B messages…";
       return;
     }
 
-    aircraftEl.innerHTML = planeHtml(data.selected, data.total ?? 0);
+    renderPlane(data.selected, data.total ?? 0);
   } catch (err) {
-    statusEl.textContent = "";
-    aircraftEl.innerHTML = `
-      <section class="plane-info empty">
-        <div class="flight">Error</div>
-        <div class="metrics">${String(err.message || err)}</div>
-      </section>
-    `;
+    renderError(String(err.message || err));
   }
 }
+
+function onLayoutChange() {
+  if (selectedPlane?.uiAngleDeg != null) {
+    positionLookArrow(selectedPlane.uiAngleDeg);
+  }
+}
+
+const resizeObserver = new ResizeObserver(onLayoutChange);
+resizeObserver.observe(planeInfoEl);
+resizeObserver.observe(hudOrbitEl);
+window.addEventListener("resize", onLayoutChange);
 
 refresh();
 setInterval(refresh, 500);
