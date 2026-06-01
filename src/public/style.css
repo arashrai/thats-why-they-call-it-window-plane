@@ -124,6 +124,14 @@ body {
   font-size: 10px;
 }
 
+.radar-ring-label {
+  font-family: var(--font-hud);
+  font-size: 6px;
+  fill: rgba(0, 240, 255, 0.35);
+  font-weight: 600;
+  pointer-events: none;
+}
+
 /* Plane Trails */
 .radar-trail-line {
   fill: none;

@@ -11,6 +11,9 @@ const airlineNameEl = document.getElementById("airline-name");
 const flightCallsignEl = document.getElementById("flight-callsign");
 const aircraftTypeEl = document.getElementById("aircraft-type");
 const maxDistLimitEl = document.getElementById("max-dist-limit");
+const ringLabelInnerEl = document.getElementById("ring-label-inner");
+const ringLabelMidEl = document.getElementById("ring-label-mid");
+const ringLabelOuterEl = document.getElementById("ring-label-outer");
 
 // Route Elements
 const routeDisplayEl = document.getElementById("route-display");
@@ -203,6 +206,12 @@ async function fetchAirspace() {
       const compassRotationOffset = 180 + config.downBearingDeg * config.bearingToUiScale;
       compassGroupEl.style.transform = `rotate(${compassRotationOffset}deg)`;
       maxDistLimitEl.textContent = lastPayload.maxDistanceKm;
+      
+      // Update dynamic ring distance labels
+      const maxDist = lastPayload.maxDistanceKm;
+      if (ringLabelInnerEl) ringLabelInnerEl.textContent = `${(maxDist * 40 / 140).toFixed(1)} km`;
+      if (ringLabelMidEl) ringLabelMidEl.textContent = `${(maxDist * 90 / 140).toFixed(1)} km`;
+      if (ringLabelOuterEl) ringLabelOuterEl.textContent = `${maxDist.toFixed(1)} km`;
     }
     
     updateNearbyAirspace(data.nearby);
