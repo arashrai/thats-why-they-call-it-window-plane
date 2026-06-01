@@ -115,7 +115,7 @@ function lerpAngle(current, target, factor) {
 function estimatePositionFromState(state, now, groundSpeedKmh, verticalRateFpm) {
   if (state.lastTrueLat == null || state.lastTrueLon == null) return null;
   
-  const ageSec = Math.min(15, (now - state.lastTrueTime) / 1000);
+  const ageSec = Math.min(300, (now - state.lastTrueTime) / 1000);
   
   let estLat = state.lastTrueLat;
   let estLon = state.lastTrueLon;
@@ -167,6 +167,9 @@ function estimatePositionFromState(state, now, groundSpeedKmh, verticalRateFpm) 
 let lastPayload = null;
 let localTimeAtFetch = 0;
 let config = null;
+let lastRenderTime = 0;
+const TARGET_FPS = 25;
+const FRAME_INTERVAL = 1000 / TARGET_FPS;
 
 // Plane States Map for turn rate estimation and 60fps path smoothing (hex => state)
 const planeStates = new Map();
@@ -234,6 +237,8 @@ function updatePlaneStates(allPlanes) {
     if (plane.hex == null) return;
     
     let state = planeStates.get(plane.hex);
+    const newTrueTime = now - (plane.seenSec || 0) * 1000;
+    
     if (!state) {
       if (plane.lat == null || plane.lon == null) return; // Wait for valid position before tracking
       
@@ -249,7 +254,8 @@ function updatePlaneStates(allPlanes) {
         lastTrueLon: plane.lon,
         lastTrueAlt: plane.altitudeFt,
         lastTrueTrack: plane.trackDeg,
-        lastTrueTime: now - (plane.seenSec || 0) * 1000,
+        lastTrueTime: newTrueTime,
+        lastTrackTime: newTrueTime,
         turnRateDegPerSec: 0,
         hasNewVerifiedCoord: true
       };
@@ -263,21 +269,33 @@ function updatePlaneStates(allPlanes) {
       state.route = plane.route || state.route;
       state.isSelectable = plane.isSelectable ?? state.isSelectable;
 
-      let turnRate = state.turnRateDegPerSec;
-      if (state.lastTrueTrack != null && plane.trackDeg != null && plane.trackDeg !== state.lastTrueTrack) {
-        const dt = ((now - (plane.seenSec || 0) * 1000) - state.lastTrueTime) / 1000;
-        if (dt > 0.1 && dt < 5.0) {
-          const diff = signedAngularDiffDeg(plane.trackDeg, state.lastTrueTrack);
-          turnRate = diff / dt;
-          if (Math.abs(turnRate) > 10) {
-            turnRate = Math.sign(turnRate) * 10;
+      let turnRate = state.turnRateDegPerSec || 0;
+      if (plane.trackDeg != null) {
+        if (state.lastTrueTrack == null) {
+          state.lastTrueTrack = plane.trackDeg;
+          state.lastTrackTime = newTrueTime;
+        } else if (plane.trackDeg !== state.lastTrueTrack) {
+          if (!state.lastTrackTime) {
+            state.lastTrackTime = state.lastTrueTime;
           }
+          const trackDt = (newTrueTime - state.lastTrackTime) / 1000;
+          if (trackDt > 0.5 && trackDt < 10.0) {
+            const diff = signedAngularDiffDeg(plane.trackDeg, state.lastTrueTrack);
+            const measuredTurnRate = diff / trackDt;
+            // Cap at 6 deg/sec (realistic limit for passenger jets) to avoid track noise spikes
+            if (Math.abs(measuredTurnRate) <= 6.0) {
+              turnRate = lerp(turnRate, measuredTurnRate, 0.25);
+            }
+          }
+          state.lastTrackTime = newTrueTime;
+          state.lastTrueTrack = plane.trackDeg;
+        } else {
+          state.lastTrackTime = newTrueTime;
         }
       }
       
       // Check if this is a new coordinate update
       if (plane.lat != null && plane.lon != null) {
-        const newTrueTime = now - (plane.seenSec || 0) * 1000;
         if (Math.abs(newTrueTime - state.lastTrueTime) > 50) {
           state.lastTrueLat = plane.lat;
           state.lastTrueLon = plane.lon;
@@ -287,9 +305,6 @@ function updatePlaneStates(allPlanes) {
       }
       if (plane.altitudeFt != null) {
         state.lastTrueAlt = plane.altitudeFt;
-      }
-      if (plane.trackDeg != null) {
-        state.lastTrueTrack = plane.trackDeg;
       }
       state.turnRateDegPerSec = turnRate;
     }
@@ -326,13 +341,18 @@ function updateNearbyAirspace(nearby) {
   nearbyListEl.innerHTML = html;
 }
 
-// 60FPS Render & Dead-Reckoning Interpolation Loop
+// FPS Throttled Render & Dead-Reckoning Interpolation Loop
 function renderLoop() {
   requestAnimationFrame(renderLoop);
   
   if (!lastPayload || !config) return;
   
   const now = Date.now();
+  const elapsedSinceLastRender = now - lastRenderTime;
+  if (elapsedSinceLastRender < FRAME_INTERVAL) {
+    return;
+  }
+  lastRenderTime = now - (elapsedSinceLastRender % FRAME_INTERVAL);
 
   // 1. Reset all trails to inactive for this frame (will set to active if plane is processed)
   for (const trail of flightTrails.values()) {
@@ -364,9 +384,9 @@ function renderLoop() {
 
   // Process and project positions of all planes
   for (const [hex, state] of planeStates.entries()) {
-    // Prune stale static planes (no update for 120s)
+    // Prune stale static planes (no update for 300s / 5 mins)
     const ageSinceLastTrue = now - state.lastTrueTime;
-    if (ageSinceLastTrue > 120000) {
+    if (ageSinceLastTrue > 300000) {
       planeStates.delete(hex);
       const trail = flightTrails.get(hex);
       if (trail) trail.active = false;
