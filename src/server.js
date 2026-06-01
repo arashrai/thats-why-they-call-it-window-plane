@@ -188,6 +188,8 @@ function getAircraftType(a) {
 
 let routeDatabase = {};
 const loggedMissingCallsigns = new Set();
+const loggedSuccessfulCallsigns = new Set();
+const loggedInvalidCallsigns = new Set();
 
 const IATA_TO_ICAO = {
   AS: "ASA",
@@ -237,6 +239,12 @@ const OPERATING_AIRLINES = [
 
 async function updateSeaSchedule() {
   console.log("[Schedule] Updating SEA Airport flight schedule...");
+
+  // Clear logging caches periodically (every 6 hours) to prevent memory growth
+  loggedMissingCallsigns.clear();
+  loggedSuccessfulCallsigns.clear();
+  loggedInvalidCallsigns.clear();
+
   const tempDatabase = {};
 
   const options = { timeZone: "America/Los_Angeles", year: "numeric", month: "numeric", day: "numeric" };
@@ -362,17 +370,37 @@ function bearingToUiAngleDeg(bearingFromHomeDeg) {
   return normalizeDeg(90 - diffFromDown * HOME.bearingToUiScale);
 }
 
-function isValidMovingAircraft(a) {
+function validateAndLogAircraft(a) {
   if (!a.hex) return false;
-  if (typeof a.lat !== "number" || typeof a.lon !== "number") return false;
 
+  const hasCoords = typeof a.lat === "number" && typeof a.lon === "number";
   const alt = a.alt_baro ?? a.alt_geom;
-  if (alt == null || typeof alt !== "number") return false;
+  const hasAlt = alt != null && typeof alt === "number";
+  const hasTrack = a.track != null && typeof a.track === "number";
+  const hasGs = a.gs != null && typeof a.gs === "number";
+  const isMoving = hasGs && a.gs >= 10;
 
-  if (a.track == null || typeof a.track !== "number") return false;
-  if (a.gs == null || typeof a.gs !== "number" || a.gs < 10) return false;
+  const isValid = hasCoords && hasAlt && hasTrack && hasGs && isMoving;
 
-  return true;
+  if (!isValid) {
+    const callsign = a.flight?.trim().toUpperCase().replace(/\s+/g, "") || null;
+    if (callsign) {
+      if (!loggedInvalidCallsigns.has(callsign)) {
+        loggedInvalidCallsigns.add(callsign);
+
+        const reasons = [];
+        if (!hasCoords) reasons.push("missing coordinates");
+        if (!hasAlt) reasons.push("missing altitude");
+        if (!hasTrack) reasons.push("missing track");
+        if (!hasGs) reasons.push("missing groundspeed");
+        if (hasGs && !isMoving) reasons.push(`stationary (speed: ${a.gs} kt)`);
+
+        console.log(`[Validation] Aircraft ${callsign} failed validation: ${reasons.join(", ")}`);
+      }
+    }
+  }
+
+  return isValid;
 }
 
 function isSelectableAircraft(a) {
@@ -434,6 +462,12 @@ function enrichAircraft(a) {
         }
       }
       route = closestEntry || entries[0];
+      if (route) {
+        if (!loggedSuccessfulCallsigns.has(cleanCallsign)) {
+          loggedSuccessfulCallsigns.add(cleanCallsign);
+          console.log(`[Lookup] Route found for ${cleanCallsign}: ${route.origin?.code} ➔ ${route.destination?.code}`);
+        }
+      }
     } else {
       if (!loggedMissingCallsigns.has(cleanCallsign)) {
         loggedMissingCallsigns.add(cleanCallsign);
@@ -473,13 +507,13 @@ function enrichAircraft(a) {
   return enriched;
 }
 
-app.get("/api/aircraft", async (_req, res) => {
+app.get("/api/aircraft", async (req, res) => {
   try {
     const raw = await fs.readFile(aircraftJsonPath, "utf8");
     const data = JSON.parse(raw);
 
     const aircraft = (data.aircraft || [])
-      .filter(isValidMovingAircraft)
+      .filter(validateAndLogAircraft)
       .map(enrichAircraft)
       .sort((a, b) => {
         if (a.isSelectable && !b.isSelectable) return -1;
@@ -490,7 +524,26 @@ app.get("/api/aircraft", async (_req, res) => {
         return aDistance - bDistance;
       });
 
-    const selected = aircraft.find((a) => a.isSelectable) || null;
+    const clientSelectedHex = req.query.selected || null;
+    const bestSelectable = aircraft.find((a) => a.isSelectable) || null;
+    let selected = null;
+
+    if (bestSelectable) {
+      const currentActive = clientSelectedHex ? aircraft.find((a) => a.hex === clientSelectedHex) : null;
+      if (currentActive && currentActive.isSelectable) {
+        const bestDistance = bestSelectable.distanceKm ?? Infinity;
+        const currentDistance = currentActive.distanceKm ?? Infinity;
+        // Hysteresis threshold: new target must be at least 1.5 km closer to trigger selection switch
+        if (bestSelectable.hex !== clientSelectedHex && bestDistance < currentDistance - 1.5) {
+          selected = bestSelectable;
+        } else {
+          selected = currentActive;
+        }
+      } else {
+        selected = bestSelectable;
+      }
+    }
+
     const nearby = aircraft
       .filter((a) => a.hex !== (selected ? selected.hex : null))
       .slice(0, 5);

@@ -204,7 +204,7 @@ let lastTrailPointTime = 0;
 // API polling
 async function fetchAirspace() {
   try {
-    const res = await fetch(`/api/aircraft?t=${Date.now()}`, { cache: "no-store" });
+    const res = await fetch(`/api/aircraft?selected=${currentSelectedHex || ""}&t=${Date.now()}`, { cache: "no-store" });
     const data = await res.json();
     
     if (!res.ok) {
