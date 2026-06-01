@@ -173,11 +173,12 @@ const planeStates = new Map();
 
 // Interpolated display state
 let currentHex = null;
+let currentSelectedHex = null;
 let displayedX = 0;
 let displayedY = 0;
 let displayedUiAngle = 0;
 
-// Multi-plane trails collection (hex => { points: [{x, y, t}], opacity: 1.0, active: boolean })
+// Multi-plane trails collection (hex => { points: [{x, y, t, isVerified}], opacity: 1.0, active: boolean })
 const flightTrails = new Map();
 let lastTrailPointTime = 0;
 
@@ -194,6 +195,10 @@ async function fetchAirspace() {
     lastPayload = data;
     localTimeAtFetch = Date.now();
     config = data.config;
+    
+    if (data.selected) {
+      currentSelectedHex = data.selected.hex;
+    }
     
     // Update plane states (turn rate & smooth position trackers)
     updatePlaneStates(data.aircraft || []);
@@ -224,11 +229,9 @@ async function fetchAirspace() {
 
 function updatePlaneStates(allPlanes) {
   const now = Date.now();
-  const activeHexes = new Set();
   
   allPlanes.forEach(plane => {
     if (plane.hex == null) return;
-    activeHexes.add(plane.hex);
     
     let state = planeStates.get(plane.hex);
     if (!state) {
@@ -236,18 +239,30 @@ function updatePlaneStates(allPlanes) {
       
       state = {
         hex: plane.hex,
+        displayName: plane.displayName || plane.hex,
+        aircraftType: plane.aircraftType,
+        groundSpeedKmh: plane.groundSpeedKmh,
+        verticalRateFpm: plane.verticalRateFpm,
+        route: plane.route,
+        isSelectable: plane.isSelectable,
         lastTrueLat: plane.lat,
         lastTrueLon: plane.lon,
         lastTrueAlt: plane.altitudeFt,
         lastTrueTrack: plane.trackDeg,
         lastTrueTime: now - (plane.seenSec || 0) * 1000,
         turnRateDegPerSec: 0,
-        smoothLat: plane.lat,
-        smoothLon: plane.lon,
-        smoothAlt: plane.altitudeFt
+        hasNewVerifiedCoord: true
       };
       planeStates.set(plane.hex, state);
     } else {
+      // Update basic fields
+      state.displayName = plane.displayName || state.displayName;
+      state.aircraftType = plane.aircraftType || state.aircraftType;
+      state.groundSpeedKmh = plane.groundSpeedKmh ?? state.groundSpeedKmh;
+      state.verticalRateFpm = plane.verticalRateFpm ?? state.verticalRateFpm;
+      state.route = plane.route || state.route;
+      state.isSelectable = plane.isSelectable ?? state.isSelectable;
+
       let turnRate = state.turnRateDegPerSec;
       if (state.lastTrueTrack != null && plane.trackDeg != null && plane.trackDeg !== state.lastTrueTrack) {
         const dt = ((now - (plane.seenSec || 0) * 1000) - state.lastTrueTime) / 1000;
@@ -260,11 +275,15 @@ function updatePlaneStates(allPlanes) {
         }
       }
       
-      // Only update positions if they are actually present in the new packet
+      // Check if this is a new coordinate update
       if (plane.lat != null && plane.lon != null) {
-        state.lastTrueLat = plane.lat;
-        state.lastTrueLon = plane.lon;
-        state.lastTrueTime = now - (plane.seenSec || 0) * 1000;
+        const newTrueTime = now - (plane.seenSec || 0) * 1000;
+        if (Math.abs(newTrueTime - state.lastTrueTime) > 50) {
+          state.lastTrueLat = plane.lat;
+          state.lastTrueLon = plane.lon;
+          state.lastTrueTime = newTrueTime;
+          state.hasNewVerifiedCoord = true;
+        }
       }
       if (plane.altitudeFt != null) {
         state.lastTrueAlt = plane.altitudeFt;
@@ -275,12 +294,6 @@ function updatePlaneStates(allPlanes) {
       state.turnRateDegPerSec = turnRate;
     }
   });
-  
-  for (const hex of planeStates.keys()) {
-    if (!activeHexes.has(hex)) {
-      planeStates.delete(hex);
-    }
-  }
 }
 
 function updateNearbyAirspace(nearby) {
@@ -319,53 +332,62 @@ function renderLoop() {
   
   if (!lastPayload || !config) return;
   
-  const selected = lastPayload.selected;
-  const allPlanes = lastPayload.aircraft || [];
   const now = Date.now();
-  const elapsedSec = (now - localTimeAtFetch) / 1000;
 
-  // 1. Reset all trails to inactive for this frame
+  // 1. Reset all trails to inactive for this frame (will set to active if plane is processed)
   for (const trail of flightTrails.values()) {
     trail.active = false;
   }
 
-  // 2. Render all planes (selected and secondary) on the radar
+  // 2. Render all planes from our persistent state map
   let secondaryHtml = "";
-  let appendTrailPoints = false;
-  
-  // Throttle trail point recording to every 150ms to keep SVG path strings compact
-  if (now - lastTrailPointTime > 150) {
-    appendTrailPoints = true;
-    lastTrailPointTime = now;
+  let activeSelected = null;
+
+  // Track selection state
+  if (currentSelectedHex) {
+    activeSelected = planeStates.get(currentSelectedHex);
+    if (!activeSelected) {
+      currentSelectedHex = null;
+    }
   }
 
-  allPlanes.forEach((plane) => {
-    const state = planeStates.get(plane.hex);
-    if (!state) return;
+  // Auto-lock to first selectable if selected is null
+  if (!currentSelectedHex) {
+    for (const [hex, state] of planeStates.entries()) {
+      if (state.isSelectable) {
+        currentSelectedHex = hex;
+        activeSelected = state;
+        break;
+      }
+    }
+  }
 
-    // Filter out stale planes that have not been seen for over 12 seconds
-    const isStale = (plane.seenSec ?? 0) > 12.0;
-
-    // Estimate raw projected position (using turn rate) from our last valid true state
-    const estPos = estimatePositionFromState(state, now, plane.groundSpeedKmh, plane.verticalRateFpm);
-    if (!estPos) return;
-
-    // Smoothly blend current state towards the projected target
-    const lerpFactor = 0.06;
-    if (state.smoothLat == null) {
-      state.smoothLat = estPos.lat;
-      state.smoothLon = estPos.lon;
-      state.smoothAlt = estPos.altitudeFt;
-    } else {
-      state.smoothLat = lerp(state.smoothLat, estPos.lat, lerpFactor);
-      state.smoothLon = lerp(state.smoothLon, estPos.lon, lerpFactor);
-      state.smoothAlt = lerp(state.smoothAlt, estPos.altitudeFt, lerpFactor);
+  // Process and project positions of all planes
+  for (const [hex, state] of planeStates.entries()) {
+    // Prune stale static planes (no update for 120s)
+    const ageSinceLastTrue = now - state.lastTrueTime;
+    if (ageSinceLastTrue > 120000) {
+      planeStates.delete(hex);
+      const trail = flightTrails.get(hex);
+      if (trail) trail.active = false;
+      continue;
     }
 
-    // Now compute everything from the SMOOTHED coordinates
-    const distNm = haversineNm(config.homeLat, config.homeLon, state.smoothLat, state.smoothLon);
+    const estPos = estimatePositionFromState(state, now, state.groundSpeedKmh, state.verticalRateFpm);
+    if (!estPos) continue;
+
+    const distNm = haversineNm(config.homeLat, config.homeLon, estPos.lat, estPos.lon);
     const distKm = distNm * 1.852;
-    const bearing = bearingDeg(config.homeLat, config.homeLon, state.smoothLat, state.smoothLon);
+
+    // Prune planes that have departed the circle
+    if (distKm > lastPayload.maxDistanceKm) {
+      planeStates.delete(hex);
+      const trail = flightTrails.get(hex);
+      if (trail) trail.active = false;
+      continue;
+    }
+
+    const bearing = bearingDeg(config.homeLat, config.homeLon, estPos.lat, estPos.lon);
     const uiAngle = bearingToUiAngleDeg(bearing, config.downBearingDeg, config.bearingToUiScale);
 
     // Unclamped coordinates for trails (so they extend past the border smoothly)
@@ -379,48 +401,76 @@ function renderLoop() {
     const y = r * Math.sin(degToRad(uiAngle));
 
     // Handle Trail appending (use UNCLAMPED coordinates)
-    let trail = flightTrails.get(plane.hex);
-    
-    // We want the trail to remain active as long as the plane is within range (even if stale!)
-    if (distKm <= lastPayload.maxDistanceKm) {
-      if (!trail) {
-        trail = { points: [], maxAge: Infinity, active: true };
-        flightTrails.set(plane.hex, trail);
-      }
-      trail.active = true;
-      trail.maxAge = Infinity; // Infinite age (no pruning) while active in the circle!
+    let trail = flightTrails.get(hex);
+    if (!trail) {
+      trail = { points: [], maxAge: Infinity, active: true };
+      flightTrails.set(hex, trail);
+    }
+    trail.active = true;
+    trail.maxAge = Infinity;
 
-      // Only append new points if the plane is not stale and we are throttled
-      if (!isStale && appendTrailPoints) {
-        trail.points.push({ x: x_unclamped, y: y_unclamped, t: now });
-      }
+    // Check if we need to record a verified point
+    if (state.hasNewVerifiedCoord) {
+      const rawDistNm = haversineNm(config.homeLat, config.homeLon, state.lastTrueLat, state.lastTrueLon);
+      const rawDistKm = rawDistNm * 1.852;
+      const rawBearing = bearingDeg(config.homeLat, config.homeLon, state.lastTrueLat, state.lastTrueLon);
+      const rawUiAngle = bearingToUiAngleDeg(rawBearing, config.downBearingDeg, config.bearingToUiScale);
+      const rawR = (rawDistKm / lastPayload.maxDistanceKm) * 140;
+      const rawX = rawR * Math.cos(degToRad(rawUiAngle));
+      const rawY = rawR * Math.sin(degToRad(rawUiAngle));
+
+      trail.points.push({
+        x: rawX,
+        y: rawY,
+        t: state.lastTrueTime,
+        isVerified: true
+      });
+      state.hasNewVerifiedCoord = false;
     }
 
-    // Render secondary targets (if it is not the main selected flight, not stale, and within range)
-    if (!isStale && (!selected || plane.hex !== selected.hex) && distKm <= lastPayload.maxDistanceKm) {
+    // Append periodic prediction points every 300ms
+    if (!state.lastPredPointTime) {
+      state.lastPredPointTime = now;
+    }
+    if (now - state.lastPredPointTime > 300) {
+      const lastPoint = trail.points[trail.points.length - 1];
+      const timeSinceLastPoint = lastPoint ? (now - lastPoint.t) : Infinity;
+      if (timeSinceLastPoint > 100) {
+        trail.points.push({
+          x: x_unclamped,
+          y: y_unclamped,
+          t: now,
+          isVerified: false
+        });
+      }
+      state.lastPredPointTime = now;
+    }
+
+    // Render secondary targets (if it is not the main selected flight)
+    const isMainSelected = activeSelected && hex === activeSelected.hex;
+    
+    if (!isMainSelected) {
+      const targetClass = ageSinceLastTrue < 1200 ? "secondary-target-dot verified" : "secondary-target-dot predicted";
       secondaryHtml += `
         <g>
-          <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" class="secondary-target-dot" />
-          <text x="${x.toFixed(1)}" y="${(y + 9).toFixed(1)}" class="secondary-target-label">${plane.displayName}</text>
+          <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" class="${targetClass}" />
+          <text x="${x.toFixed(1)}" y="${(y + 9).toFixed(1)}" class="secondary-target-label">${state.displayName}</text>
         </g>
       `;
     }
-  });
+  }
 
   // Write secondary targets to SVG
   secondaryTargetsEl.innerHTML = secondaryHtml;
 
-  // 3. Decay and Render Trails (fade older segments first)
+  // 3. Decay and Render Trails (dotted format)
   let trailsHtml = "";
   for (const [hex, trail] of flightTrails.entries()) {
-    // If trail is inactive (plane departed or vanished), decay its maxAge
     if (!trail.active) {
       if (trail.maxAge === Infinity) {
-        // Just transitioned to inactive: initialize maxAge to actual span of the points (min 30s)
         const oldestAge = (trail.points && trail.points.length > 0) ? (now - trail.points[0].t) : 30000;
         trail.maxAge = Math.max(30000, oldestAge);
       }
-      // Shrink maxAge by 150ms per frame (completely vanishes in ~3.3 seconds)
       trail.maxAge = Math.max(0, trail.maxAge - 150);
       if (trail.maxAge <= 0 || trail.points.length === 0) {
         flightTrails.delete(hex);
@@ -428,30 +478,26 @@ function renderLoop() {
       }
     }
 
-    // Filter points based on current maxAge
     if (trail.maxAge !== Infinity) {
       trail.points = trail.points.filter(p => now - p.t < trail.maxAge);
     }
 
-    if (trail.points.length > 1) {
-      for (let i = 0; i < trail.points.length - 1; i++) {
-        const pStart = trail.points[i];
-        const pEnd = trail.points[i + 1];
-        
-        // Calculate age factor based on average age of segment endpoints
-        const ageMs = now - (pStart.t + pEnd.t) / 2;
+    if (trail.points.length > 0) {
+      for (const p of trail.points) {
+        const ageMs = now - p.t;
         let ageFactor;
         if (trail.maxAge === Infinity) {
-          // While active inside range: no decay or shortening at all (constant opacity)
           ageFactor = 0.85;
         } else {
-          // While decaying after departure: collapse trail in temporal order
           ageFactor = Math.max(0, 1 - ageMs / trail.maxAge);
         }
-        
-        // Render segment with age factor opacity (head is bolder, tail is faded)
+
         if (ageFactor > 0.01) {
-          trailsHtml += `<line x1="${pStart.x.toFixed(1)}" y1="${pStart.y.toFixed(1)}" x2="${pEnd.x.toFixed(1)}" y2="${pEnd.y.toFixed(1)}" class="radar-trail-line" stroke-opacity="${ageFactor.toFixed(2)}" />`;
+          if (p.isVerified) {
+            trailsHtml += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.8" class="trail-dot-verified" opacity="${ageFactor.toFixed(2)}" />`;
+          } else {
+            trailsHtml += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="1.2" class="trail-dot-predicted" opacity="${ageFactor.toFixed(2)}" />`;
+          }
         }
       }
     }
@@ -459,7 +505,7 @@ function renderLoop() {
   radarTrailsEl.innerHTML = trailsHtml;
 
   // 4. Render Main Locked Telemetry / Active Target
-  if (!selected) {
+  if (!activeSelected) {
     flightDataEl.classList.add("hidden");
     noFlightCardEl.classList.remove("hidden");
     targetGroupEl.classList.add("hidden");
@@ -469,13 +515,13 @@ function renderLoop() {
     return;
   }
 
-  // Get smoothed coordinates for the selected plane
-  const selectedState = planeStates.get(selected.hex);
-  if (selectedState && selectedState.smoothLat != null) {
-    const sDistNm = haversineNm(config.homeLat, config.homeLon, selectedState.smoothLat, selectedState.smoothLon);
+  // Get current estimated coordinates for the selected plane
+  const sEstPos = estimatePositionFromState(activeSelected, now, activeSelected.groundSpeedKmh, activeSelected.verticalRateFpm);
+  if (sEstPos) {
+    const sDistNm = haversineNm(config.homeLat, config.homeLon, sEstPos.lat, sEstPos.lon);
     const sDistKm = sDistNm * 1.852;
-    const sBearing = bearingDeg(config.homeLat, config.homeLon, selectedState.smoothLat, selectedState.smoothLon);
-    const sElevation = elevationAngleDeg(sDistNm, selectedState.smoothAlt, config.homeElevationFt);
+    const sBearing = bearingDeg(config.homeLat, config.homeLon, sEstPos.lat, sEstPos.lon);
+    const sElevation = elevationAngleDeg(sDistNm, sEstPos.altitudeFt, config.homeElevationFt);
     const sUiAngle = bearingToUiAngleDeg(sBearing, config.downBearingDeg, config.bearingToUiScale);
 
     // Map to SVG coordinates
@@ -483,16 +529,25 @@ function renderLoop() {
     const sTargetX = sR * Math.cos(degToRad(sUiAngle));
     const sTargetY = sR * Math.sin(degToRad(sUiAngle));
 
-    // Handle reticle swap snap vs lerp
-    if (selected.hex !== currentHex) {
-      currentHex = selected.hex;
-      displayedUiAngle = sUiAngle;
-      displayedX = sTargetX;
-      displayedY = sTargetY;
+    // Instant coordinate snapping on updates, no lagging lerps
+    displayedUiAngle = sUiAngle;
+    displayedX = sTargetX;
+    displayedY = sTargetY;
+
+    // Toggle verified vs predicted styles on HUD reticle and tracking arrow
+    const ageSinceLastTrue = now - activeSelected.lastTrueTime;
+    const isVerifiedRecent = ageSinceLastTrue < 1200; // Updated in last 1.2s
+
+    if (isVerifiedRecent) {
+      targetGroupEl.classList.add("verified");
+      targetGroupEl.classList.remove("predicted");
+      radarArrowOrbitEl.classList.add("verified");
+      radarArrowOrbitEl.classList.remove("predicted");
     } else {
-      displayedUiAngle = lerpAngle(displayedUiAngle, sUiAngle, 0.08);
-      displayedX = lerp(displayedX, sTargetX, 0.1);
-      displayedY = lerp(displayedY, sTargetY, 0.1);
+      targetGroupEl.classList.add("predicted");
+      targetGroupEl.classList.remove("verified");
+      radarArrowOrbitEl.classList.add("predicted");
+      radarArrowOrbitEl.classList.remove("verified");
     }
 
     // Update active HUD elements
@@ -510,31 +565,31 @@ function renderLoop() {
     arrowBearingLabelEl.textContent = `${Math.round(sBearing).toString().padStart(3, "0")}°`;
 
     // Update Text Dashboard
-    airlineNameEl.textContent = selected.route?.airline || (selected.displayName.startsWith("a") ? "AIRCRAFT" : "COMMERCIAL FLIGHT");
-    flightCallsignEl.textContent = selected.displayName;
-    aircraftTypeEl.textContent = selected.aircraftType || "Aircraft type unknown";
+    airlineNameEl.textContent = activeSelected.route?.airline || (activeSelected.displayName.startsWith("a") ? "AIRCRAFT" : "COMMERCIAL FLIGHT");
+    flightCallsignEl.textContent = activeSelected.displayName;
+    aircraftTypeEl.textContent = activeSelected.aircraftType || "Aircraft type unknown";
 
-    if (selected.route?.origin && selected.route?.destination) {
-      routeOriginCodeEl.textContent = selected.route.origin.code;
-      routeOriginNameEl.textContent = selected.route.origin.name;
-      routeDestinationCodeEl.textContent = selected.route.destination.code;
-      routeDestinationNameEl.textContent = selected.route.destination.name;
+    if (activeSelected.route?.origin && activeSelected.route?.destination) {
+      routeOriginCodeEl.textContent = activeSelected.route.origin.code;
+      routeOriginNameEl.textContent = activeSelected.route.origin.name;
+      routeDestinationCodeEl.textContent = activeSelected.route.destination.code;
+      routeDestinationNameEl.textContent = activeSelected.route.destination.name;
       routeDisplayEl.classList.remove("hidden");
     } else {
       routeDisplayEl.classList.add("hidden");
     }
 
-    // Telemetry display bindings using SMOOTHED coordinates!
-    metricAltitudeEl.textContent = Math.round(selectedState.smoothAlt).toLocaleString();
+    // Telemetry display bindings using estimated coordinates
+    metricAltitudeEl.textContent = Math.round(sEstPos.altitudeFt).toLocaleString();
 
-    if (selected.verticalRateFpm > 128) {
+    if (activeSelected.verticalRateFpm > 128) {
       verticalTrendIconEl.textContent = "▲";
       verticalTrendIconEl.style.color = "#10b981";
-      metricVerticalRateEl.textContent = `+${Math.round(selected.verticalRateFpm)} FPM`;
-    } else if (selected.verticalRateFpm < -128) {
+      metricVerticalRateEl.textContent = `+${Math.round(activeSelected.verticalRateFpm)} FPM`;
+    } else if (activeSelected.verticalRateFpm < -128) {
       verticalTrendIconEl.textContent = "▼";
       verticalTrendIconEl.style.color = "#3b82f6";
-      metricVerticalRateEl.textContent = `${Math.round(selected.verticalRateFpm)} FPM`;
+      metricVerticalRateEl.textContent = `${Math.round(activeSelected.verticalRateFpm)} FPM`;
     } else {
       verticalTrendIconEl.textContent = "—";
       verticalTrendIconEl.style.color = "rgba(255, 255, 255, 0.4)";
@@ -543,12 +598,12 @@ function renderLoop() {
 
     metricDistanceEl.textContent = sDistKm.toFixed(1);
     metricElevationEl.textContent = `${getElevationDescription(sElevation)} (${Math.round(sElevation)}° up)`;
-    metricSpeedEl.textContent = Math.round(selected.groundSpeedKmh || 0);
+    metricSpeedEl.textContent = Math.round(activeSelected.groundSpeedKmh || 0);
     metricBearingEl.textContent = Math.round(sBearing);
     metricBearingDirectionEl.textContent = getCardinalDirection(sBearing);
     
     // Show signal age relative to last true updates
-    const selectedAge = (now - selectedState.lastTrueTime) / 1000;
+    const selectedAge = ageSinceLastTrue / 1000;
     signalAgeEl.textContent = `UPDATED ${selectedAge.toFixed(1)}S AGO`;
   }
 }

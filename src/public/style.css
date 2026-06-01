@@ -142,10 +142,27 @@ body {
 
 /* Secondary Targets */
 .secondary-target-dot {
-  fill: var(--accent-cyan);
   stroke: #ffffff;
   stroke-width: 0.5;
+  transition: fill 0.2s ease, filter 0.2s ease;
+}
+
+.secondary-target-dot.verified {
+  fill: var(--accent-amber);
+  filter: drop-shadow(0 0 3px var(--accent-amber));
+}
+
+.secondary-target-dot.predicted {
+  fill: var(--accent-cyan);
   filter: drop-shadow(0 0 2px var(--accent-cyan));
+}
+
+.trail-dot-verified {
+  fill: var(--accent-amber);
+}
+
+.trail-dot-predicted {
+  fill: var(--accent-cyan);
 }
 
 .secondary-target-label {
@@ -162,20 +179,35 @@ body {
   will-change: transform;
 }
 
-.target-point {
+/* Verified locked target: amber */
+.target-group.verified .target-point {
   fill: var(--accent-amber);
   stroke: #ffffff;
   stroke-width: 0.75;
 }
-
-.target-ring {
+.target-group.verified .target-ring {
   fill: none;
   stroke: var(--accent-amber);
   stroke-width: 1.5;
 }
-
-.target-cross {
+.target-group.verified .target-cross {
   stroke: var(--accent-amber);
+  stroke-width: 1.25;
+}
+
+/* Predicted locked target: cyan */
+.target-group.predicted .target-point {
+  fill: var(--accent-cyan);
+  stroke: #ffffff;
+  stroke-width: 0.75;
+}
+.target-group.predicted .target-ring {
+  fill: none;
+  stroke: var(--accent-cyan);
+  stroke-width: 1.5;
+}
+.target-group.predicted .target-cross {
+  stroke: var(--accent-cyan);
   stroke-width: 1.25;
 }
 
@@ -207,10 +239,19 @@ body {
 }
 
 .arrow-shape {
-  fill: var(--accent-cyan);
   stroke: #ffffff;
   stroke-width: 1.5;
   stroke-linejoin: round;
+  transition: fill 0.2s ease, filter 0.2s ease;
+}
+
+.radar-arrow-orbit.verified .arrow-shape {
+  fill: var(--accent-amber);
+  filter: drop-shadow(0 0 6px var(--accent-amber));
+}
+
+.radar-arrow-orbit.predicted .arrow-shape {
+  fill: var(--accent-cyan);
   filter: drop-shadow(0 0 6px var(--accent-cyan));
 }
 
@@ -218,12 +259,21 @@ body {
   font-family: var(--font-hud);
   font-size: 11px;
   font-weight: 900;
-  color: var(--accent-cyan);
   background-color: #000000;
   padding: 2px 4px;
-  border: 1px solid var(--accent-cyan);
   border-radius: 4px;
   transform: rotate(calc(-1 * var(--arrow-angle, 0deg) - 90deg));
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.radar-arrow-orbit.verified .arrow-bearing-label {
+  color: var(--accent-amber);
+  border: 1px solid var(--accent-amber);
+}
+
+.radar-arrow-orbit.predicted .arrow-bearing-label {
+  color: var(--accent-cyan);
+  border: 1px solid var(--accent-cyan);
 }
 
 /* Scanning visualization when idle - Hidden for minimalism */
