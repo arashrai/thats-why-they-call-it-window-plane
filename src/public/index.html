@@ -76,9 +76,7 @@
             </div>
             
             <!-- Scanning Overlay -->
-            <div id="scanning-overlay" class="scanning-overlay">
-              <div class="scanning-ripple"></div>
-              <div class="scanning-text font-hud">SCANNING SKY...</div>
+            <div id="scanning-overlay" class="scanning-overlay hidden">
             </div>
           </div>
         </div>
@@ -103,10 +101,7 @@
                   <span id="route-origin-code" class="airport-code font-hud">SFO</span>
                   <span id="route-origin-name" class="airport-name">San Francisco</span>
                 </div>
-                <div class="route-connector">
-                  <div class="connector-line"></div>
-                  <span class="connector-icon">✈</span>
-                </div>
+                <div class="route-connector">➔</div>
                 <div class="airport-block">
                   <span id="route-destination-code" class="airport-code font-hud">SEA</span>
                   <span id="route-destination-name" class="airport-name">Seattle</span>
@@ -159,7 +154,6 @@
 
           <!-- Empty state when no plane is locked -->
           <div id="no-flight-card" class="no-flight-card">
-            <div class="sonar-wave"></div>
             <h2 class="font-hud">NO SELECTABLE TARGETS</h2>
             <p>Waiting for aircraft to enter the airspace (<span id="max-dist-limit">10</span> km range)</p>
           </div>
