@@ -237,7 +237,7 @@ function updatePlaneStates(allPlanes) {
     if (plane.hex == null) return;
     
     let state = planeStates.get(plane.hex);
-    const newTrueTime = now - (plane.seenSec || 0) * 1000;
+    const newTrueTime = now - (plane.seenPosSec || plane.seenSec || 0) * 1000;
     
     if (!state) {
       if (plane.lat == null || plane.lon == null) return; // Wait for valid position before tracking

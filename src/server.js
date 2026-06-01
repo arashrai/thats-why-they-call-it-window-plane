@@ -359,6 +359,7 @@ function enrichAircraft(a) {
     trackDeg: a.track ?? null,
     verticalRateFpm: a.baro_rate ?? a.geom_rate ?? null,
     seenSec: a.seen ?? null,
+    seenPosSec: a.seen_pos ?? a.seen ?? null,
     distanceNm,
     distanceKm,
     bearingFromHomeDeg,
