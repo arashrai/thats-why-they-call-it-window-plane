@@ -533,8 +533,8 @@ app.get("/api/aircraft", async (req, res) => {
       if (currentActive && currentActive.isSelectable) {
         const bestDistance = bestSelectable.distanceKm ?? Infinity;
         const currentDistance = currentActive.distanceKm ?? Infinity;
-        // Hysteresis threshold: new target must be at least 1.5 km closer to trigger selection switch
-        if (bestSelectable.hex !== clientSelectedHex && bestDistance < currentDistance - 1.5) {
+        // Hysteresis threshold: new target must be at least 0.3 km closer to trigger selection switch
+        if (bestSelectable.hex !== clientSelectedHex && bestDistance < currentDistance - 0.3) {
           selected = bestSelectable;
         } else {
           selected = currentActive;
@@ -572,20 +572,22 @@ app.get("/api/aircraft", async (req, res) => {
   }
 });
 
-app.listen(port, "0.0.0.0", async () => {
+// Load initial flight schedule first
+console.log("[Schedule] Initializing SEA Airport flight schedule...");
+try {
+  await updateSeaSchedule();
+} catch (err) {
+  console.error("[Schedule] Failed to load initial flight schedule:", err.message);
+}
+
+// Refresh schedule every 6 hours
+setInterval(() => {
+  updateSeaSchedule().catch((err) => {
+    console.error("[Schedule] Failed to update flight schedule:", err.message);
+  });
+}, 6 * 60 * 60 * 1000);
+
+app.listen(port, "0.0.0.0", () => {
   console.log(`Window Plane running at http://0.0.0.0:${port}`);
   console.log(`Reading aircraft from ${aircraftJsonPath}`);
-
-  try {
-    await updateSeaSchedule();
-  } catch (err) {
-    console.error("[Schedule] Failed to load initial flight schedule:", err.message);
-  }
-
-  // Refresh schedule every 6 hours
-  setInterval(() => {
-    updateSeaSchedule().catch((err) => {
-      console.error("[Schedule] Failed to update flight schedule:", err.message);
-    });
-  }, 6 * 60 * 60 * 1000);
 });

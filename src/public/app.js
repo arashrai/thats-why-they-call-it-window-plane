@@ -111,6 +111,35 @@ function lerpAngle(current, target, factor) {
   return current + diff * factor;
 }
 
+function calculateKinematicsFromCoords(coords) {
+  if (coords.length < 3) return null;
+  
+  const p1 = coords[coords.length - 3];
+  const p2 = coords[coords.length - 2];
+  const p3 = coords[coords.length - 1];
+  
+  if (p1.lat === p2.lat && p1.lon === p2.lon) return null;
+  if (p2.lat === p3.lat && p2.lon === p3.lon) return null;
+  
+  const h12 = bearingDeg(p1.lat, p1.lon, p2.lat, p2.lon);
+  const h23 = bearingDeg(p2.lat, p2.lon, p3.lat, p3.lon);
+  
+  const dt12 = (p2.t - p1.t) / 1000;
+  const dt23 = (p3.t - p2.t) / 1000;
+  
+  if (dt12 <= 0.1 || dt23 <= 0.1) return null;
+  
+  const diff = signedAngularDiffDeg(h23, h12);
+  const dt = 0.5 * dt12 + 0.5 * dt23;
+  const measuredTurnRate = diff / dt;
+  
+  // Extrapolate track to the time of the latest point (p3)
+  const dtExtrapolate = 0.5 * dt23;
+  const measuredTrack = normalizeDeg(h23 + measuredTurnRate * dtExtrapolate);
+  
+  return { measuredTurnRate, measuredTrack };
+}
+
 // Curved position interpolator accounting for turn rate, dead-reckoning from last known true state
 function estimatePositionFromState(state, now, groundSpeedKmh, verticalRateFpm) {
   if (state.lastTrueLat == null || state.lastTrueLon == null) return null;
@@ -271,7 +300,8 @@ function updatePlaneStates(allPlanes) {
         lastTrueTime: newTrueTime,
         lastTrackTime: newTrueTime,
         turnRateDegPerSec: 0,
-        hasNewVerifiedCoord: true
+        hasNewVerifiedCoord: true,
+        verifiedCoords: [{ lat: plane.lat, lon: plane.lon, t: newTrueTime }]
       };
       planeStates.set(plane.hex, state);
     } else {
@@ -283,43 +313,51 @@ function updatePlaneStates(allPlanes) {
       state.route = plane.route || state.route;
       state.isSelectable = plane.isSelectable ?? state.isSelectable;
 
-      let turnRate = state.turnRateDegPerSec || 0;
-      if (plane.trackDeg != null) {
-        if (state.lastTrueTrack == null) {
-          state.lastTrueTrack = plane.trackDeg;
-          state.lastTrackTime = newTrueTime;
-        } else if (plane.trackDeg !== state.lastTrueTrack) {
-          if (!state.lastTrackTime) {
-            state.lastTrackTime = state.lastTrueTime;
-          }
-          const trackDt = (newTrueTime - state.lastTrackTime) / 1000;
-          if (trackDt > 0.5 && trackDt < 10.0) {
-            const diff = signedAngularDiffDeg(plane.trackDeg, state.lastTrueTrack);
-            const measuredTurnRate = diff / trackDt;
-            // Cap at 6 deg/sec (realistic limit for passenger jets) to avoid track noise spikes
-            if (Math.abs(measuredTurnRate) <= 6.0) {
-              turnRate = lerp(turnRate, measuredTurnRate, 0.25);
-            }
-          }
-          state.lastTrackTime = newTrueTime;
-          state.lastTrueTrack = plane.trackDeg;
-        } else {
-          state.lastTrackTime = newTrueTime;
-        }
-      }
-      
       // Check if this is a new coordinate update
+      let hasNewCoord = false;
       if (plane.lat != null && plane.lon != null) {
         if (Math.abs(newTrueTime - state.lastTrueTime) > 50) {
           state.lastTrueLat = plane.lat;
           state.lastTrueLon = plane.lon;
           state.lastTrueTime = newTrueTime;
           state.hasNewVerifiedCoord = true;
+          hasNewCoord = true;
+          
+          if (!state.verifiedCoords) {
+            state.verifiedCoords = [];
+          }
+          state.verifiedCoords.push({ lat: plane.lat, lon: plane.lon, t: newTrueTime });
+          if (state.verifiedCoords.length > 5) {
+            state.verifiedCoords.shift();
+          }
         }
       }
+      
       if (plane.altitudeFt != null) {
         state.lastTrueAlt = plane.altitudeFt;
       }
+
+      // Calculate turn rate and heading from coordinate history
+      let turnRate = state.turnRateDegPerSec || 0;
+      if (state.verifiedCoords && state.verifiedCoords.length >= 3) {
+        if (hasNewCoord) {
+          const kinematics = calculateKinematicsFromCoords(state.verifiedCoords);
+          if (kinematics) {
+            const clampedTurnRate = Math.max(-6.0, Math.min(6.0, kinematics.measuredTurnRate));
+            turnRate = lerp(turnRate, clampedTurnRate, 0.25);
+            state.lastTrueTrack = kinematics.measuredTrack;
+            state.lastTrackTime = newTrueTime;
+          }
+        }
+      } else {
+        // Fallback to reported trackDeg if coordinate history is not sufficient
+        if (plane.trackDeg != null) {
+          state.lastTrueTrack = plane.trackDeg;
+          state.lastTrackTime = newTrueTime;
+        }
+        turnRate = 0;
+      }
+      
       state.turnRateDegPerSec = turnRate;
     }
   });
@@ -385,16 +423,7 @@ function renderLoop() {
     }
   }
 
-  // Auto-lock to first selectable if selected is null
-  if (!currentSelectedHex) {
-    for (const [hex, state] of planeStates.entries()) {
-      if (state.isSelectable) {
-        currentSelectedHex = hex;
-        activeSelected = state;
-        break;
-      }
-    }
-  }
+  // Auto-lock fallback removed to respect server-driven selection lock policy
 
   for (const [hex, state] of planeStates.entries()) {
     const ageSinceLastTrue = now - state.lastTrueTime;
