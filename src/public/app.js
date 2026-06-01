@@ -108,8 +108,8 @@ function lerpAngle(current, target, factor) {
   return current + diff * factor;
 }
 
-// Dead-Reckoning Position Extrapolator
-function estimatePosition(plane, ageSec) {
+// Curved position interpolator accounting for turn rate
+function estimatePosition(plane, ageSec, turnRateDegPerSec = 0) {
   if (plane.lat == null || plane.lon == null) return null;
   
   let estLat = plane.lat;
@@ -118,13 +118,30 @@ function estimatePosition(plane, ageSec) {
   
   if (plane.groundSpeedKmh != null && plane.trackDeg != null) {
     const speedKms = plane.groundSpeedKmh / 3600;
-    const distanceKm = speedKms * ageSec;
     const trackRad = degToRad(plane.trackDeg);
     
+    let dLatKm = 0;
+    let dLonKm = 0;
+
+    if (Math.abs(turnRateDegPerSec) < 0.05) {
+      // Straight line approximation
+      const distanceKm = speedKms * ageSec;
+      dLatKm = distanceKm * Math.cos(trackRad);
+      dLonKm = distanceKm * Math.sin(trackRad);
+    } else {
+      // Curved path kinematics
+      const turnRateRad = degToRad(turnRateDegPerSec);
+      const vOverW = speedKms / turnRateRad;
+      const endTrackRad = trackRad + turnRateRad * ageSec;
+      
+      dLatKm = vOverW * (Math.sin(endTrackRad) - Math.sin(trackRad));
+      dLonKm = vOverW * (Math.cos(trackRad) - Math.cos(endTrackRad));
+    }
+
     // 1 degree latitude = 111.32 km
-    const dLat = (distanceKm * Math.cos(trackRad)) / 111.32;
+    const dLat = dLatKm / 111.32;
     // 1 degree longitude = 111.32 * cos(lat) km
-    const dLon = (distanceKm * Math.sin(trackRad)) / (111.32 * Math.cos(degToRad(plane.lat)));
+    const dLon = dLonKm / (111.32 * Math.cos(degToRad(plane.lat)));
     
     estLat += dLat;
     estLon += dLon;
@@ -142,6 +159,9 @@ function estimatePosition(plane, ageSec) {
 let lastPayload = null;
 let localTimeAtFetch = 0;
 let config = null;
+
+// Plane States Map for turn rate estimation and 60fps path smoothing (hex => state)
+const planeStates = new Map();
 
 // Interpolated display state
 let currentHex = null;
@@ -167,6 +187,9 @@ async function fetchAirspace() {
     localTimeAtFetch = Date.now();
     config = data.config;
     
+    // Update plane states (turn rate & smooth position trackers)
+    updatePlaneStates(data.aircraft || []);
+    
     // Hide error overlay
     errorOverlayEl.classList.add("hidden");
     
@@ -182,6 +205,60 @@ async function fetchAirspace() {
     console.error("Fetch airspace failed:", err);
     errorMessageEl.textContent = `Unable to query receiver feed: ${err.message}`;
     errorOverlayEl.classList.remove("hidden");
+  }
+}
+
+function updatePlaneStates(allPlanes) {
+  const now = Date.now();
+  const activeHexes = new Set();
+  
+  allPlanes.forEach(plane => {
+    if (plane.hex == null) return;
+    activeHexes.add(plane.hex);
+    
+    let state = planeStates.get(plane.hex);
+    if (!state) {
+      state = {
+        hex: plane.hex,
+        lastTrueLat: plane.lat,
+        lastTrueLon: plane.lon,
+        lastTrueAlt: plane.altitudeFt,
+        lastTrueTrack: plane.trackDeg,
+        lastTrueTime: now,
+        turnRateDegPerSec: 0,
+        smoothLat: plane.lat,
+        smoothLon: plane.lon,
+        smoothAlt: plane.altitudeFt
+      };
+      planeStates.set(plane.hex, state);
+    } else {
+      let turnRate = 0;
+      if (state.lastTrueTrack != null && plane.trackDeg != null) {
+        const dt = (now - state.lastTrueTime) / 1000;
+        if (dt > 0.1 && dt < 5.0) {
+          const diff = signedAngularDiffDeg(plane.trackDeg, state.lastTrueTrack);
+          turnRate = diff / dt;
+          if (Math.abs(turnRate) > 10) {
+            turnRate = Math.sign(turnRate) * 10;
+          }
+        } else {
+          turnRate = state.turnRateDegPerSec;
+        }
+      }
+      
+      state.lastTrueLat = plane.lat;
+      state.lastTrueLon = plane.lon;
+      state.lastTrueAlt = plane.altitudeFt;
+      state.lastTrueTrack = plane.trackDeg;
+      state.lastTrueTime = now;
+      state.turnRateDegPerSec = turnRate;
+    }
+  });
+  
+  for (const hex of planeStates.keys()) {
+    if (!activeHexes.has(hex)) {
+      planeStates.delete(hex);
+    }
   }
 }
 
@@ -242,22 +319,45 @@ function renderLoop() {
   }
 
   allPlanes.forEach((plane) => {
-    const planeAge = (plane.seenSec ?? 0) + elapsedSec;
-    const estPos = estimatePosition(plane, planeAge);
+    const state = planeStates.get(plane.hex);
+    if (!state) return;
+
+    // Calculate age relative to the last true package update
+    const ageSec = Math.min(10, (now - state.lastTrueTime) / 1000);
+    
+    // Estimate raw projected position (using turn rate)
+    const estPos = estimatePosition(plane, ageSec, state.turnRateDegPerSec);
     if (!estPos) return;
 
-    // Calculate proximity metrics from Home
-    const distNm = haversineNm(config.homeLat, config.homeLon, estPos.lat, estPos.lon);
+    // Smoothly blend current state towards the projected target
+    const lerpFactor = 0.06;
+    if (state.smoothLat == null) {
+      state.smoothLat = estPos.lat;
+      state.smoothLon = estPos.lon;
+      state.smoothAlt = estPos.altitudeFt;
+    } else {
+      state.smoothLat = lerp(state.smoothLat, estPos.lat, lerpFactor);
+      state.smoothLon = lerp(state.smoothLon, estPos.lon, lerpFactor);
+      state.smoothAlt = lerp(state.smoothAlt, estPos.altitudeFt, lerpFactor);
+    }
+
+    // Now compute everything from the SMOOTHED coordinates
+    const distNm = haversineNm(config.homeLat, config.homeLon, state.smoothLat, state.smoothLon);
     const distKm = distNm * 1.852;
-    const bearing = bearingDeg(config.homeLat, config.homeLon, estPos.lat, estPos.lon);
+    const bearing = bearingDeg(config.homeLat, config.homeLon, state.smoothLat, state.smoothLon);
     const uiAngle = bearingToUiAngleDeg(bearing, config.downBearingDeg, config.bearingToUiScale);
 
-    // Map to SVG coordinates
-    const r = Math.min(140, (distKm / lastPayload.maxDistanceKm) * 140);
+    // Unclamped coordinates for trails (so they extend past the border smoothly)
+    const r_unclamped = (distKm / lastPayload.maxDistanceKm) * 140;
+    const x_unclamped = r_unclamped * Math.cos(degToRad(uiAngle));
+    const y_unclamped = r_unclamped * Math.sin(degToRad(uiAngle));
+
+    // Clamped coordinates for targets/dots on the radar grid
+    const r = Math.min(140, r_unclamped);
     const x = r * Math.cos(degToRad(uiAngle));
     const y = r * Math.sin(degToRad(uiAngle));
 
-    // Handle Trail appending
+    // Handle Trail appending (use UNCLAMPED coordinates)
     let trail = flightTrails.get(plane.hex);
     if (!trail) {
       trail = { points: [], opacity: 1.0, active: true };
@@ -265,18 +365,16 @@ function renderLoop() {
     }
     
     trail.active = true;
-    
-    // Only reset opacity if it's currently detected in the feed
     trail.opacity = 1.0;
 
     if (appendTrailPoints) {
-      trail.points.push({ x, y, t: now });
+      trail.points.push({ x: x_unclamped, y: y_unclamped, t: now });
       // Keep trailing path length to last 30 seconds
       trail.points = trail.points.filter(p => now - p.t < 30000);
     }
 
-    // Render secondary targets (if it is not the main selected flight)
-    if (!selected || plane.hex !== selected.hex) {
+    // Render secondary targets (if it is not the main selected flight and within range)
+    if ((!selected || plane.hex !== selected.hex) && distKm <= lastPayload.maxDistanceKm) {
       secondaryHtml += `
         <g>
           <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" class="secondary-target-dot" />
@@ -289,7 +387,7 @@ function renderLoop() {
   // Write secondary targets to SVG
   secondaryTargetsEl.innerHTML = secondaryHtml;
 
-  // 3. Decay and Render Trails
+  // 3. Decay and Render Trails (fade older segments first)
   let trailsHtml = "";
   for (const [hex, trail] of flightTrails.entries()) {
     // If plane has vanished from the active receiver feed, decay its opacity
@@ -302,11 +400,19 @@ function renderLoop() {
     }
 
     if (trail.points.length > 1) {
-      let pathString = `M ${trail.points[0].x.toFixed(1)} ${trail.points[0].y.toFixed(1)}`;
-      for (let i = 1; i < trail.points.length; i++) {
-        pathString += ` L ${trail.points[i].x.toFixed(1)} ${trail.points[i].y.toFixed(1)}`;
+      for (let i = 0; i < trail.points.length - 1; i++) {
+        const pStart = trail.points[i];
+        const pEnd = trail.points[i + 1];
+        
+        // Calculate age factor based on average age of segment endpoints
+        const ageMs = now - (pStart.t + pEnd.t) / 2;
+        const ageFactor = Math.max(0, 1 - ageMs / 30000);
+        const segmentOpacity = ageFactor * trail.opacity;
+        
+        if (segmentOpacity > 0.01) {
+          trailsHtml += `<line x1="${pStart.x.toFixed(1)}" y1="${pStart.y.toFixed(1)}" x2="${pEnd.x.toFixed(1)}" y2="${pEnd.y.toFixed(1)}" class="radar-trail-line" stroke-opacity="${segmentOpacity.toFixed(2)}" />`;
+        }
       }
-      trailsHtml += `<path d="${pathString}" class="radar-trail-line" opacity="${trail.opacity.toFixed(2)}" />`;
     }
   }
   radarTrailsEl.innerHTML = trailsHtml;
@@ -322,17 +428,16 @@ function renderLoop() {
     return;
   }
 
-  // Active target calculations
-  const selectedAge = selected.seenSec + elapsedSec;
-  const estSelectedPos = estimatePosition(selected, selectedAge);
-  
-  if (estSelectedPos) {
-    const sDistNm = haversineNm(config.homeLat, config.homeLon, estSelectedPos.lat, estSelectedPos.lon);
+  // Get smoothed coordinates for the selected plane
+  const selectedState = planeStates.get(selected.hex);
+  if (selectedState && selectedState.smoothLat != null) {
+    const sDistNm = haversineNm(config.homeLat, config.homeLon, selectedState.smoothLat, selectedState.smoothLon);
     const sDistKm = sDistNm * 1.852;
-    const sBearing = bearingDeg(config.homeLat, config.homeLon, estSelectedPos.lat, estSelectedPos.lon);
-    const sElevation = elevationAngleDeg(sDistNm, estSelectedPos.altitudeFt, config.homeElevationFt);
+    const sBearing = bearingDeg(config.homeLat, config.homeLon, selectedState.smoothLat, selectedState.smoothLon);
+    const sElevation = elevationAngleDeg(sDistNm, selectedState.smoothAlt, config.homeElevationFt);
     const sUiAngle = bearingToUiAngleDeg(sBearing, config.downBearingDeg, config.bearingToUiScale);
 
+    // Map to SVG coordinates
     const sR = Math.min(140, (sDistKm / lastPayload.maxDistanceKm) * 140);
     const sTargetX = sR * Math.cos(degToRad(sUiAngle));
     const sTargetY = sR * Math.sin(degToRad(sUiAngle));
@@ -357,10 +462,10 @@ function renderLoop() {
     scanningOverlayEl.classList.add("hidden");
 
     // Position target reticle
-    targetGroupEl.setAttribute("transform", `translate(${displayedX}, ${displayedY})`);
+    targetGroupEl.setAttribute("transform", `translate(${displayedX.toFixed(1)}, ${displayedY.toFixed(1)})`);
 
     // Position tracking arrow & bearing label
-    radarArrowOrbitEl.style.setProperty("--arrow-angle", `${displayedUiAngle}deg`);
+    radarArrowOrbitEl.style.setProperty("--arrow-angle", `${displayedUiAngle.toFixed(1)}deg`);
     arrowBearingLabelEl.textContent = `${Math.round(sBearing).toString().padStart(3, "0")}°`;
 
     // Update Text Dashboard
@@ -378,8 +483,8 @@ function renderLoop() {
       routeDisplayEl.classList.add("hidden");
     }
 
-    // Telemetry display bindings
-    metricAltitudeEl.textContent = Math.round(estSelectedPos.altitudeFt).toLocaleString();
+    // Telemetry display bindings using SMOOTHED coordinates!
+    metricAltitudeEl.textContent = Math.round(selectedState.smoothAlt).toLocaleString();
 
     if (selected.verticalRateFpm > 128) {
       verticalTrendIconEl.textContent = "▲";
@@ -400,6 +505,9 @@ function renderLoop() {
     metricSpeedEl.textContent = Math.round(selected.groundSpeedKmh || 0);
     metricBearingEl.textContent = Math.round(sBearing);
     metricBearingDirectionEl.textContent = getCardinalDirection(sBearing);
+    
+    // Show signal age relative to last true updates
+    const selectedAge = (now - selectedState.lastTrueTime) / 1000;
     signalAgeEl.textContent = `UPDATED ${selectedAge.toFixed(1)}S AGO`;
   }
 }

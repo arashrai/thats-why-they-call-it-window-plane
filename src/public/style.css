@@ -128,9 +128,8 @@ body {
 .radar-trail-line {
   fill: none;
   stroke: var(--accent-cyan);
-  stroke-width: 2.5;
+  stroke-width: 1.5;
   stroke-linecap: round;
-  stroke-dasharray: 1 5;
 }
 
 /* Secondary Targets */

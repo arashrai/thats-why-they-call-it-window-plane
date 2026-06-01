@@ -18,6 +18,11 @@
           <div id="radar" class="radar">
             <!-- Radar SVG Grid -->
             <svg id="radar-grid" class="radar-grid" viewBox="-150 -150 300 300">
+              <defs>
+                <clipPath id="radar-clip">
+                  <circle cx="0" cy="0" r="140" />
+                </clipPath>
+              </defs>
               <!-- Radial rings -->
               <circle r="40" class="grid-ring ring-inner" />
               <circle r="90" class="grid-ring ring-mid" />
@@ -49,10 +54,10 @@
               </g>
 
               <!-- Dynamic decaying trails group -->
-              <g id="radar-trails" class="radar-trails"></g>
+              <g id="radar-trails" class="radar-trails" clip-path="url(#radar-clip)"></g>
 
               <!-- Secondary target dots and labels -->
-              <g id="secondary-targets" class="secondary-targets"></g>
+              <g id="secondary-targets" class="secondary-targets" clip-path="url(#radar-clip)"></g>
 
               <!-- Target indicators (glowing locked target) -->
               <g id="target-group" class="target-group hidden">
