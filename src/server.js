@@ -186,64 +186,18 @@ function getAircraftType(a) {
   return AIRCRAFT_TYPES[typeCode] || typeCode;
 }
 
-const CACHE_FILE = path.join(process.cwd(), "data/routes-cache.json");
 let routeCache = {};
 const fetchInProgress = new Set();
 
-const CACHE_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-const NOT_FOUND_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_EXPIRY_MS = 60 * 60 * 1000; // 1 hour (for routes, failures, not founds)
 
 function cleanExpiredCacheEntries() {
   const now = Date.now();
-  let modified = false;
   for (const [key, value] of Object.entries(routeCache)) {
-    const timestamp = value.timestamp || 0;
-    const age = now - timestamp;
-    if (value.notFound) {
-      if (age > NOT_FOUND_EXPIRY_MS) {
-        delete routeCache[key];
-        modified = true;
-      }
-    } else if (value.failed) {
-      if (age > 60 * 60 * 1000) { // 1 hour for temp errors
-        delete routeCache[key];
-        modified = true;
-      }
-    } else {
-      if (age > CACHE_EXPIRY_MS) {
-        delete routeCache[key];
-        modified = true;
-      }
+    const age = now - (value.timestamp || 0);
+    if (age > CACHE_EXPIRY_MS) {
+      delete routeCache[key];
     }
-  }
-  if (modified) {
-    console.log("[CACHE] Evicted expired cache entries.");
-    saveRouteCache();
-  }
-}
-
-async function initRouteCache() {
-  try {
-    await fs.mkdir(path.dirname(CACHE_FILE), { recursive: true });
-    const data = await fs.readFile(CACHE_FILE, "utf8");
-    routeCache = JSON.parse(data);
-    console.log(`[CACHE] Loaded ${Object.keys(routeCache).length} cached flight routes.`);
-    cleanExpiredCacheEntries();
-  } catch (err) {
-    if (err.code !== "ENOENT") {
-      console.error("[CACHE] Error reading routes cache:", err);
-    } else {
-      console.log("[CACHE] No routes cache file found. Starting empty.");
-    }
-  }
-}
-
-async function saveRouteCache() {
-  try {
-    await fs.mkdir(path.dirname(CACHE_FILE), { recursive: true });
-    await fs.writeFile(CACHE_FILE, JSON.stringify(routeCache, null, 2), "utf8");
-  } catch (err) {
-    console.error("[CACHE] Error saving routes cache:", err);
   }
 }
 
@@ -252,6 +206,9 @@ function triggerRouteLookup(callsign) {
   const cleanCallsign = callsign.trim().toUpperCase().replace(/\s+/g, "");
   if (!cleanCallsign) return;
 
+  // Prune any expired cache entries
+  cleanExpiredCacheEntries();
+
   const cached = routeCache[cleanCallsign];
   if (fetchInProgress.has(cleanCallsign)) {
     return;
@@ -259,18 +216,7 @@ function triggerRouteLookup(callsign) {
 
   const now = Date.now();
   if (cached) {
-    if (cached.notFound) {
-      return; // Do not query known not found items (24h expiry handles invalidation)
-    }
-    if (cached.failed) {
-      const retryDelayMs = 60 * 60 * 1000; // 1 hour
-      if (now - cached.timestamp < retryDelayMs) {
-        return; // Do not retry transient errors within 1 hour
-      }
-      console.log(`[API] Retrying route lookup for callsign ${cleanCallsign} after 1 hour...`);
-    } else {
-      return; // Already cached successfully
-    }
+    return; // Already has cached data, 404, or transient failure within the 1 hour expiry
   }
 
   fetchInProgress.add(cleanCallsign);
@@ -283,8 +229,7 @@ function triggerRouteLookup(callsign) {
           notFound: true,
           timestamp: now
         };
-        saveRouteCache();
-        console.log(`[API] Route for ${cleanCallsign} not found (404). Caching negative result for 24h.`);
+        console.log(`[API] Route for ${cleanCallsign} not found (404). Caching negative result for 1h.`);
         return null;
       }
 
@@ -318,18 +263,16 @@ function triggerRouteLookup(callsign) {
           notFound: true,
           timestamp: now
         };
-        console.log(`[API] Response for ${cleanCallsign} lacked route info. Caching negative result for 24h.`);
+        console.log(`[API] Response for ${cleanCallsign} lacked route info. Caching negative result for 1h.`);
       }
-      saveRouteCache();
     })
     .catch((err) => {
       console.error(`[API] Error fetching route for ${cleanCallsign}:`, err.message);
       // Cache as temporary failure to prevent retries for 1 hour
       routeCache[cleanCallsign] = {
         failed: true,
-        timestamp: Date.now()
+        timestamp: now
       };
-      saveRouteCache();
     })
     .finally(() => {
       fetchInProgress.delete(cleanCallsign);
@@ -479,9 +422,7 @@ app.get("/api/aircraft", async (_req, res) => {
   }
 });
 
-initRouteCache().then(() => {
-  app.listen(port, "0.0.0.0", () => {
-    console.log(`Window Plane running at http://0.0.0.0:${port}`);
-    console.log(`Reading aircraft from ${aircraftJsonPath}`);
-  });
+app.listen(port, "0.0.0.0", () => {
+  console.log(`Window Plane running at http://0.0.0.0:${port}`);
+  console.log(`Reading aircraft from ${aircraftJsonPath}`);
 });
