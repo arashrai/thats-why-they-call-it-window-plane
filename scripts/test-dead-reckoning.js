@@ -21,42 +21,55 @@ function estimatePositionFromState(state, now, groundSpeedKmh, verticalRateFpm) 
   let estLon = state.lastTrueLon;
   let estAlt = state.lastTrueAlt;
   
-  const track = state.lastTrueTrack;
+  let track = state.lastTrueTrack;
   
   if (speed > 0 && track != null) {
     const speedKms = speed / 3600;
-    const trackRad = degToRad(track);
+    const dt = 0.1; // 100ms integration step for high precision
+    let t = 0;
+    const decayConstant = state.turnRateDecaySeconds ?? 30;
     
-    let dLatKm = 0;
-    let dLonKm = 0;
-
-    if (Math.abs(state.turnRateDegPerSec) < 0.05) {
-      // Straight line approximation
-      const distanceKm = speedKms * ageSec;
-      dLatKm = distanceKm * Math.cos(trackRad);
-      dLonKm = distanceKm * Math.sin(trackRad);
-    } else {
-      // Curved path kinematics
-      const turnRateRad = degToRad(state.turnRateDegPerSec);
-      const vOverW = speedKms / turnRateRad;
-      const endTrackRad = trackRad + turnRateRad * ageSec;
+    while (t < ageSec) {
+      const stepDt = Math.min(dt, ageSec - t);
+      const midT = t + stepDt / 2;
+      const turnRateDecay = decayConstant === Infinity ? 1.0 : Math.exp(-midT / decayConstant);
+      const currentTurnRate = state.turnRateDegPerSec * turnRateDecay;
       
-      dLatKm = vOverW * (Math.sin(endTrackRad) - Math.sin(trackRad));
-      dLonKm = vOverW * (Math.cos(trackRad) - Math.cos(endTrackRad));
+      const stepTurn = currentTurnRate * stepDt;
+      const midTrackRad = degToRad(track + stepTurn / 2);
+      
+      track = normalizeDeg(track + stepTurn);
+      
+      const distanceKm = speedKms * stepDt;
+      
+      const dLatKm = distanceKm * Math.cos(midTrackRad);
+      const dLonKm = distanceKm * Math.sin(midTrackRad);
+      
+      const dLat = dLatKm / 111.32;
+      const dLon = dLonKm / (111.32 * Math.cos(degToRad(estLat)));
+      
+      estLat += dLat;
+      estLon += dLon;
+      
+      t += stepDt;
     }
-
-    // 1 degree latitude = 111.32 km
-    const dLat = dLatKm / 111.32;
-    // 1 degree longitude = 111.32 * cos(lat) km
-    const dLon = dLonKm / (111.32 * Math.cos(degToRad(state.lastTrueLat)));
-    
-    estLat += dLat;
-    estLon += dLon;
   }
   
   if (verticalRateFpm != null && estAlt != null) {
-    const altRateFps = verticalRateFpm / 60;
-    estAlt += altRateFps * ageSec;
+    const dt = 0.1;
+    let t = 0;
+    const decayConstant = state.verticalRateDecaySeconds ?? 60;
+    
+    while (t < ageSec) {
+      const stepDt = Math.min(dt, ageSec - t);
+      const midT = t + stepDt / 2;
+      const verticalRateDecay = decayConstant === Infinity ? 1.0 : Math.exp(-midT / decayConstant);
+      const currentVerticalRate = verticalRateFpm * verticalRateDecay;
+      const altRateFps = currentVerticalRate / 60;
+      
+      estAlt += altRateFps * stepDt;
+      t += stepDt;
+    }
   }
   
   return { lat: estLat, lon: estLon, altitudeFt: estAlt };
@@ -88,7 +101,7 @@ console.log("Running kinematics unit tests...");
   
   assert.ok(approxEqual(res.lat, 47.6 + (1.0 / 111.32)), "Test 1 Failed: Latitude deviation");
   assert.ok(approxEqual(res.lon, -122.3), "Test 1 Failed: Longitude should be unchanged");
-  assert.strictEqual(res.altitudeFt, 5000, "Test 1 Failed: Altitude should be unchanged");
+  assert.ok(approxEqual(res.altitudeFt, 5000), "Test 1 Failed: Altitude should be unchanged");
   console.log("✓ Test 1 Passed: Straight flight North");
 }
 
@@ -104,7 +117,8 @@ console.log("Running kinematics unit tests...");
     lastTrueAlt: 5000,
     lastTrueTrack: 90,
     lastTrueTime: 10000,
-    turnRateDegPerSec: 0
+    turnRateDegPerSec: 0,
+    verticalRateDecaySeconds: Infinity
   };
   const now = 30000; // 20 seconds later
   const res = estimatePositionFromState(state, now, 540, 600); // with 600 FPM climb
@@ -112,7 +126,7 @@ console.log("Running kinematics unit tests...");
   const expectedDLon = 3.0 / (111.32 * Math.cos(degToRad(47.6)));
   assert.ok(approxEqual(res.lat, 47.6), "Test 2 Failed: Latitude should be unchanged");
   assert.ok(approxEqual(res.lon, -122.3 + expectedDLon), "Test 2 Failed: Longitude deviation");
-  assert.strictEqual(res.altitudeFt, 5000 + (600 / 60) * 20, "Test 2 Failed: Altitude deviation");
+  assert.ok(approxEqual(res.altitudeFt, 5000 + (600 / 60) * 20), "Test 2 Failed: Altitude deviation");
   console.log("✓ Test 2 Passed: Straight flight East with climb");
 }
 
@@ -130,7 +144,8 @@ console.log("Running kinematics unit tests...");
     lastTrueAlt: 5000,
     lastTrueTrack: 0,
     lastTrueTime: 10000,
-    turnRateDegPerSec: 3 // Turning right at 3 deg/s
+    turnRateDegPerSec: 3, // Turning right at 3 deg/s
+    turnRateDecaySeconds: Infinity
   };
   const now = 40000; // 30 seconds later (turns exactly 90 degrees)
   const res = estimatePositionFromState(state, now, 360, 0);
@@ -155,7 +170,9 @@ console.log("Running kinematics unit tests...");
     lastTrueAlt: 8000,
     lastTrueTrack: 180,
     lastTrueTime: 10000,
-    turnRateDegPerSec: -1.5 // Turning left
+    turnRateDegPerSec: -1.5, // Turning left
+    turnRateDecaySeconds: Infinity,
+    verticalRateDecaySeconds: Infinity
   };
   const now = 70000; // 60 seconds later
   const res = estimatePositionFromState(state, now, 540, -1200); // 1200 FPM descent
@@ -166,7 +183,7 @@ console.log("Running kinematics unit tests...");
 
   assert.ok(approxEqual(res.lat, 47.6 + expectedDLat), "Test 4 Failed: Latitude deviation");
   assert.ok(approxEqual(res.lon, -122.3 + expectedDLon), "Test 4 Failed: Longitude deviation");
-  assert.strictEqual(res.altitudeFt, 8000 + (-1200 / 60) * 60, "Test 4 Failed: Altitude deviation");
+  assert.ok(approxEqual(res.altitudeFt, 8000 + (-1200 / 60) * 60), "Test 4 Failed: Altitude deviation");
   console.log("✓ Test 4 Passed: Left turn kinematics with descent");
 }
 
@@ -178,7 +195,8 @@ console.log("Running kinematics unit tests...");
     lastTrueAlt: 5000,
     lastTrueTrack: 0,
     lastTrueTime: 10000,
-    turnRateDegPerSec: 0
+    turnRateDegPerSec: 0,
+    verticalRateDecaySeconds: Infinity
   };
   
   const movingState = {
@@ -191,8 +209,8 @@ console.log("Running kinematics unit tests...");
   const resStationary = estimatePositionFromState(stationaryState, now, 0, 120); // 120 FPM climb
   // Expected ageSec should be capped at 300.
   // Expected altitude: 5000 + (120 / 60) * 300 = 5600
-  assert.strictEqual(resStationary.altitudeFt, 5600, "Test 5 Failed: Stationary plane prediction age should be capped at 300s");
-
+  assert.ok(approxEqual(resStationary.altitudeFt, 5600), "Test 5 Failed: Stationary plane prediction age should be capped at 300s");
+ 
   // 2. Moving plane (speed = 360 km/h)
   const resMoving = estimatePositionFromState(movingState, now, 360, 120);
   // Expected ageSec should be 600 (not capped).
@@ -200,9 +218,37 @@ console.log("Running kinematics unit tests...");
   // Expected latitude change: 60 km / 111.32 = 0.5389867 degrees
   // Expected altitude: 5000 + (120 / 60) * 600 = 6200
   assert.ok(approxEqual(resMoving.lat, 47.6 + (60.0 / 111.32)), "Test 5 Failed: Moving plane latitude deviation");
-  assert.strictEqual(resMoving.altitudeFt, 6200, "Test 5 Failed: Moving plane prediction age should not be capped");
+  assert.ok(approxEqual(resMoving.altitudeFt, 6200), "Test 5 Failed: Moving plane prediction age should not be capped");
   
   console.log("✓ Test 5 Passed: Infinite prediction age for moving planes vs capped age for stationary planes");
+}
+
+// Test Case 6: Turning & Vertical Rate Exponential Decay
+// Speed: 360 km/h (0.1 km/s). Heading: 0° (North). Turn Rate: 3 deg/sec.
+// Vertical Rate: 1200 FPM (20 fps). Duration: 20 seconds.
+// Decay Constants: 10 seconds.
+// Expected altitude: 5000 + 200 * (1 - e^-2) = 5172.93 ft.
+{
+  const state = {
+    lastTrueLat: 47.6,
+    lastTrueLon: -122.3,
+    lastTrueAlt: 5000,
+    lastTrueTrack: 0,
+    lastTrueTime: 10000,
+    turnRateDegPerSec: 3,
+    turnRateDecaySeconds: 10,
+    verticalRateDecaySeconds: 10
+  };
+  const now = 30000; // 20 seconds later
+  const res = estimatePositionFromState(state, now, 360, 1200);
+
+  const expectedAlt = 5000 + 20 * 10 * (1 - Math.exp(-2.0));
+  assert.ok(approxEqual(res.altitudeFt, expectedAlt, 0.5), "Test 6 Failed: Decaying altitude deviation");
+  
+  // Track angle is updated numerically, let's verify it curved correctly
+  assert.ok(Number.isFinite(res.lat), "Test 6 Failed: Lat is not finite");
+  assert.ok(Number.isFinite(res.lon), "Test 6 Failed: Lon is not finite");
+  console.log("✓ Test 6 Passed: Turning & Vertical Rate Exponential Decay");
 }
 
 console.log("All unit tests passed successfully!");

@@ -125,42 +125,55 @@ function estimatePositionFromState(state, now, groundSpeedKmh, verticalRateFpm) 
   let estLon = state.lastTrueLon;
   let estAlt = state.lastTrueAlt;
   
-  const track = state.lastTrueTrack;
+  let track = state.lastTrueTrack;
   
   if (speed > 0 && track != null) {
     const speedKms = speed / 3600;
-    const trackRad = degToRad(track);
+    const dt = 0.1; // 100ms integration step for high precision
+    let t = 0;
+    const decayConstant = state.turnRateDecaySeconds ?? 30;
     
-    let dLatKm = 0;
-    let dLonKm = 0;
-
-    if (Math.abs(state.turnRateDegPerSec) < 0.05) {
-      // Straight line approximation
-      const distanceKm = speedKms * ageSec;
-      dLatKm = distanceKm * Math.cos(trackRad);
-      dLonKm = distanceKm * Math.sin(trackRad);
-    } else {
-      // Curved path kinematics
-      const turnRateRad = degToRad(state.turnRateDegPerSec);
-      const vOverW = speedKms / turnRateRad;
-      const endTrackRad = trackRad + turnRateRad * ageSec;
+    while (t < ageSec) {
+      const stepDt = Math.min(dt, ageSec - t);
+      const midT = t + stepDt / 2;
+      const turnRateDecay = decayConstant === Infinity ? 1.0 : Math.exp(-midT / decayConstant);
+      const currentTurnRate = state.turnRateDegPerSec * turnRateDecay;
       
-      dLatKm = vOverW * (Math.sin(endTrackRad) - Math.sin(trackRad));
-      dLonKm = vOverW * (Math.cos(trackRad) - Math.cos(endTrackRad));
+      const stepTurn = currentTurnRate * stepDt;
+      const midTrackRad = degToRad(track + stepTurn / 2);
+      
+      track = normalizeDeg(track + stepTurn);
+      
+      const distanceKm = speedKms * stepDt;
+      
+      const dLatKm = distanceKm * Math.cos(midTrackRad);
+      const dLonKm = distanceKm * Math.sin(midTrackRad);
+      
+      const dLat = dLatKm / 111.32;
+      const dLon = dLonKm / (111.32 * Math.cos(degToRad(estLat)));
+      
+      estLat += dLat;
+      estLon += dLon;
+      
+      t += stepDt;
     }
-
-    // 1 degree latitude = 111.32 km
-    const dLat = dLatKm / 111.32;
-    // 1 degree longitude = 111.32 * cos(lat) km
-    const dLon = dLonKm / (111.32 * Math.cos(degToRad(state.lastTrueLat)));
-    
-    estLat += dLat;
-    estLon += dLon;
   }
   
   if (verticalRateFpm != null && estAlt != null) {
-    const altRateFps = verticalRateFpm / 60;
-    estAlt += altRateFps * ageSec;
+    const dt = 0.1;
+    let t = 0;
+    const decayConstant = state.verticalRateDecaySeconds ?? 60;
+    
+    while (t < ageSec) {
+      const stepDt = Math.min(dt, ageSec - t);
+      const midT = t + stepDt / 2;
+      const verticalRateDecay = decayConstant === Infinity ? 1.0 : Math.exp(-midT / decayConstant);
+      const currentVerticalRate = verticalRateFpm * verticalRateDecay;
+      const altRateFps = currentVerticalRate / 60;
+      
+      estAlt += altRateFps * stepDt;
+      t += stepDt;
+    }
   }
   
   return { lat: estLat, lon: estLon, altitudeFt: estAlt };
@@ -438,9 +451,6 @@ function renderLoop() {
 
     // Check if we need to record a verified point
     if (state.hasNewVerifiedCoord) {
-      // 1. Clear any predicted (blue) points that were added after the new verified coordinate's timestamp
-      trail.points = trail.points.filter(p => p.isVerified || p.t <= state.lastTrueTime);
-
       const rawDistNm = haversineNm(config.homeLat, config.homeLon, state.lastTrueLat, state.lastTrueLon);
       const rawDistKm = rawDistNm * 1.852;
       const rawBearing = bearingDeg(config.homeLat, config.homeLon, state.lastTrueLat, state.lastTrueLon);
@@ -449,42 +459,13 @@ function renderLoop() {
       const rawX = rawR * Math.cos(degToRad(rawUiAngle));
       const rawY = rawR * Math.sin(degToRad(rawUiAngle));
 
-      // 2. Add the verified orange dot
       trail.points.push({
         x: rawX,
         y: rawY,
         t: state.lastTrueTime,
         isVerified: true
       });
-
-      // 3. Backfill predicted blue dots for the lag duration (from state.lastTrueTime + 300ms up to now)
-      let backfillT = Math.max(now - 30000, state.lastTrueTime + 300); // cap backfill at 30 seconds
-      while (backfillT <= now) {
-        const est = estimatePositionFromState(state, backfillT, state.groundSpeedKmh, state.verticalRateFpm);
-        if (est) {
-          const estDistNm = haversineNm(config.homeLat, config.homeLon, est.lat, est.lon);
-          const estDistKm = estDistNm * 1.852;
-          const estBearing = bearingDeg(config.homeLat, config.homeLon, est.lat, est.lon);
-          const estUiAngle = bearingToUiAngleDeg(estBearing, config.downBearingDeg, config.bearingToUiScale);
-          const estR = (estDistKm / lastPayload.maxDistanceKm) * 140;
-          const estX = estR * Math.cos(degToRad(estUiAngle));
-          const estY = estR * Math.sin(degToRad(estUiAngle));
-
-          trail.points.push({
-            x: estX,
-            y: estY,
-            t: backfillT,
-            isVerified: false
-          });
-        }
-        backfillT += 300;
-      }
-
-      // Sort the trail points to ensure perfect chronological rendering order
-      trail.points.sort((a, b) => a.t - b.t);
-
       state.hasNewVerifiedCoord = false;
-      state.lastPredPointTime = now;
     }
 
     // Append periodic prediction points every 300ms
