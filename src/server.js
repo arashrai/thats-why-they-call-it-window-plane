@@ -186,97 +186,126 @@ function getAircraftType(a) {
   return AIRCRAFT_TYPES[typeCode] || typeCode;
 }
 
-let routeCache = {};
-const fetchInProgress = new Set();
+let routeDatabase = {};
 
-const CACHE_EXPIRY_MS = 60 * 60 * 1000; // 1 hour (for routes, failures, not founds)
+const IATA_TO_ICAO = {
+  AS: "ASA",
+  DL: "DAL",
+  UA: "UAL",
+  WN: "SWA",
+  QX: "QXE",
+  OO: "SKW",
+  AA: "AAL",
+  FX: "FDX",
+  "5X": "UPS",
+  HA: "HAL",
+  B6: "JBU",
+  NK: "NKS",
+  F9: "FFT",
+  AC: "ACA",
+  BA: "BAW",
+  LH: "DLH",
+  EK: "UAE",
+  QR: "QTR",
+  BR: "EVA",
+  SQ: "SIA",
+  NH: "ANA",
+  JL: "JAL",
+  AM: "AMX",
+  AF: "AFR",
+  DE: "CFG",
+  FI: "ICE",
+  HU: "CHH",
+  KE: "KAL",
+  OZ: "AAR",
+  TN: "UTN", // Air Tahiti Nui
+  EI: "EIN"  // Aer Lingus
+};
 
-function cleanExpiredCacheEntries() {
-  const now = Date.now();
-  for (const [key, value] of Object.entries(routeCache)) {
-    const age = now - (value.timestamp || 0);
-    if (age > CACHE_EXPIRY_MS) {
-      delete routeCache[key];
+async function updateSeaSchedule() {
+  console.log("[Schedule] Updating SEA Airport flight schedule...");
+  const tempDatabase = {};
+
+  const options = { timeZone: "America/Los_Angeles", year: "numeric", month: "numeric", day: "numeric" };
+  const formatter = new Intl.DateTimeFormat("en-US", options);
+
+  const today = new Date();
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const dates = [
+    formatter.format(today).split("/"),
+    formatter.format(tomorrow).split("/")
+  ];
+
+  const types = ["dep", "arr"];
+  const startHours = [0, 12];
+
+  for (const [month, day, year] of dates) {
+    for (const type of types) {
+      for (const startHour of startHours) {
+        const url = `https://www.flightstats.com/v2/api-next/flight-tracker/${type}/SEA/${year}/${month}/${day}/${startHour}?numHours=12`;
+        try {
+          const res = await fetch(url, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+          });
+          if (!res.ok) {
+            console.error(`[Schedule] Failed to fetch schedule from ${url}: Status ${res.status}`);
+            continue;
+          }
+          const data = await res.json();
+          const flights = data?.data?.flights || [];
+          const isArrival = type === "arr";
+
+          for (const flight of flights) {
+            if (!flight.carrier?.fs || !flight.carrier?.flightNumber) continue;
+
+            const iata = flight.carrier.fs.trim().toUpperCase();
+            const flightNum = flight.carrier.flightNumber.trim();
+            const icao = IATA_TO_ICAO[iata];
+
+            const routeInfo = {
+              airline: flight.carrier.name || null,
+              origin: isArrival ? {
+                code: flight.airport?.fs || null,
+                name: flight.airport?.city || null,
+                airport: flight.airport?.city || null
+              } : {
+                code: "SEA",
+                name: "Seattle",
+                airport: "Seattle-Tacoma Intl"
+              },
+              destination: isArrival ? {
+                code: "SEA",
+                name: "Seattle",
+                airport: "Seattle-Tacoma Intl"
+              } : {
+                code: flight.airport?.fs || null,
+                name: flight.airport?.city || null,
+                airport: flight.airport?.city || null
+              }
+            };
+
+            tempDatabase[`${iata}${flightNum}`] = routeInfo;
+            if (icao) {
+              tempDatabase[`${icao}${flightNum}`] = routeInfo;
+            }
+          }
+        } catch (err) {
+          console.error(`[Schedule] Error fetching slot ${type} starting at hour ${startHour} on ${year}-${month}-${day}:`, err.message);
+        }
+      }
     }
   }
-}
 
-function triggerRouteLookup(callsign) {
-  if (!callsign) return;
-  const cleanCallsign = callsign.trim().toUpperCase().replace(/\s+/g, "");
-  if (!cleanCallsign) return;
-
-  // Prune any expired cache entries
-  cleanExpiredCacheEntries();
-
-  const cached = routeCache[cleanCallsign];
-  if (fetchInProgress.has(cleanCallsign)) {
-    return;
+  if (Object.keys(tempDatabase).length > 0) {
+    routeDatabase = tempDatabase;
+    console.log(`[Schedule] Successfully loaded ${Object.keys(routeDatabase).length} routes into database.`);
+  } else {
+    console.warn("[Schedule] Update returned 0 routes. Retaining current route database.");
   }
-
-  const now = Date.now();
-  if (cached) {
-    return; // Already has cached data, 404, or transient failure within the 1 hour expiry
-  }
-
-  fetchInProgress.add(cleanCallsign);
-  console.log(`[API] Fetching route info for callsign: ${cleanCallsign}`);
-
-  fetch(`https://api.adsbdb.com/v0/callsign/${cleanCallsign}`)
-    .then((res) => {
-      if (res.status === 404) {
-        routeCache[cleanCallsign] = {
-          notFound: true,
-          timestamp: now
-        };
-        console.log(`[API] Route for ${cleanCallsign} not found (404). Caching negative result for 1h.`);
-        return null;
-      }
-
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-      return res.json();
-    })
-    .then((data) => {
-      if (!data) return; // 404 handled above
-
-      const routeInfo = data?.response?.flightroute || null;
-      if (routeInfo) {
-        routeCache[cleanCallsign] = {
-          airline: routeInfo.airline?.name || null,
-          origin: routeInfo.origin ? {
-            code: routeInfo.origin.iata_code || routeInfo.origin.icao_code || null,
-            name: routeInfo.origin.municipality || routeInfo.origin.name || null,
-            airport: routeInfo.origin.name || null
-          } : null,
-          destination: routeInfo.destination ? {
-            code: routeInfo.destination.iata_code || routeInfo.destination.icao_code || null,
-            name: routeInfo.destination.municipality || routeInfo.destination.name || null,
-            airport: routeInfo.destination.name || null
-          } : null,
-          timestamp: now
-        };
-        console.log(`[API] Successfully cached route for ${cleanCallsign}: ${routeCache[cleanCallsign].origin?.code} -> ${routeCache[cleanCallsign].destination?.code}`);
-      } else {
-        routeCache[cleanCallsign] = {
-          notFound: true,
-          timestamp: now
-        };
-        console.log(`[API] Response for ${cleanCallsign} lacked route info. Caching negative result for 1h.`);
-      }
-    })
-    .catch((err) => {
-      console.error(`[API] Error fetching route for ${cleanCallsign}:`, err.message);
-      // Cache as temporary failure to prevent retries for 1 hour
-      routeCache[cleanCallsign] = {
-        failed: true,
-        timestamp: now
-      };
-    })
-    .finally(() => {
-      fetchInProgress.delete(cleanCallsign);
-    });
 }
 
 function bearingToUiAngleDeg(bearingFromHomeDeg) {
@@ -352,11 +381,7 @@ function enrichAircraft(a) {
   const elev = elevationAngleDeg(distanceNm, altitudeFt, HOME.elevationFt);
 
   const cleanCallsign = a.flight?.trim().toUpperCase().replace(/\s+/g, "") || null;
-  const route = cleanCallsign ? routeCache[cleanCallsign] : null;
-
-  if (cleanCallsign) {
-    triggerRouteLookup(cleanCallsign);
-  }
+  const route = cleanCallsign ? routeDatabase[cleanCallsign] : null;
 
   const enriched = {
     hex: a.hex,
@@ -377,11 +402,7 @@ function enrichAircraft(a) {
     bearingFromHomeDeg,
     elevationAngleDeg: elev,
     uiAngleDeg: bearingToUiAngleDeg(bearingFromHomeDeg),
-    route: (route && !route.notFound && !route.failed) ? {
-      airline: route.airline,
-      origin: route.origin,
-      destination: route.destination
-    } : null
+    route: route || null
   };
 
   enriched.isSelectable = isSelectableAircraft(enriched);
@@ -435,7 +456,20 @@ app.get("/api/aircraft", async (_req, res) => {
   }
 });
 
-app.listen(port, "0.0.0.0", () => {
+app.listen(port, "0.0.0.0", async () => {
   console.log(`Window Plane running at http://0.0.0.0:${port}`);
   console.log(`Reading aircraft from ${aircraftJsonPath}`);
+
+  try {
+    await updateSeaSchedule();
+  } catch (err) {
+    console.error("[Schedule] Failed to load initial flight schedule:", err.message);
+  }
+
+  // Refresh schedule every 6 hours
+  setInterval(() => {
+    updateSeaSchedule().catch((err) => {
+      console.error("[Schedule] Failed to update flight schedule:", err.message);
+    });
+  }, 6 * 60 * 60 * 1000);
 });
