@@ -1,18 +1,9 @@
 /* Custom properties for the HUD theme */
 :root {
   --bg-color: #000000;
-  --panel-bg: rgba(12, 18, 28, 0.75);
-  --border-color: rgba(0, 240, 255, 0.22);
-  
-  /* Primary Accent: Glowing Cyan */
-  --accent-cyan: hsl(184, 100%, 50%);
-  --accent-cyan-rgb: 0, 240, 255;
-  
-  /* Highlight Accent: Glowing Amber */
+  --accent-cyan: #00f0ff;
   --accent-amber: #ffb703;
-  --accent-amber-rgb: 255, 183, 3;
-  
-  /* Typography */
+  --border-color: rgba(0, 240, 255, 0.2);
   --font-hud: 'Orbitron', monospace;
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
 }
@@ -25,16 +16,14 @@
 }
 
 html, body {
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
   background-color: var(--bg-color);
   color: #ffffff;
   font-family: var(--font-sans);
   overflow: hidden;
-  position: relative;
 }
 
-/* General classes */
 .font-hud {
   font-family: var(--font-hud);
   letter-spacing: 0.05em;
@@ -46,17 +35,14 @@ html, body {
 
 .hidden {
   display: none !important;
-  opacity: 0;
-  pointer-events: none;
 }
 
 /* Two-column dashboard layout */
 .app-container {
   display: grid;
-  grid-template-columns: 1.15fr 1fr;
+  grid-template-columns: 55vw 45vw;
   height: 100vh;
   width: 100vw;
-  background-color: var(--bg-color);
 }
 
 /* Left panel: Radar */
@@ -64,10 +50,9 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 3vw;
-  position: relative;
+  padding: 20px;
+  background: radial-gradient(circle at center, rgba(0, 240, 255, 0.04) 0%, transparent 70%);
   border-right: 1px solid var(--border-color);
-  background: radial-gradient(circle at center, rgba(0, 240, 255, 0.04) 0%, transparent 75%);
 }
 
 .radar-aspect-box {
@@ -81,9 +66,9 @@ html, body {
   height: 100%;
   border-radius: 50%;
   border: 1.5px solid var(--border-color);
-  background-color: rgba(4, 6, 10, 0.95);
+  background-color: #04060a;
   position: relative;
-  box-shadow: 0 0 50px rgba(0, 240, 255, 0.06) inset;
+  box-shadow: 0 0 40px rgba(0, 240, 255, 0.05) inset;
 }
 
 /* SVG grid lines */
@@ -99,22 +84,22 @@ html, body {
 
 .grid-ring {
   fill: none;
-  stroke: rgba(0, 240, 255, 0.12);
+  stroke: rgba(0, 240, 255, 0.1);
   stroke-width: 1.25;
 }
 
 .ring-outer {
-  stroke: rgba(0, 240, 255, 0.25);
-  stroke-dasharray: 5 5;
+  stroke: rgba(0, 240, 255, 0.22);
+  stroke-dasharray: 4 4;
 }
 
 .grid-axis {
-  stroke: rgba(0, 240, 255, 0.12);
+  stroke: rgba(0, 240, 255, 0.1);
   stroke-width: 1;
 }
 
 .grid-tick {
-  stroke: rgba(0, 240, 255, 0.3);
+  stroke: rgba(0, 240, 255, 0.25);
   stroke-width: 1.25;
 }
 
@@ -127,18 +112,17 @@ html, body {
 
 .compass-label {
   font-family: var(--font-hud);
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 800;
-  fill: rgba(0, 240, 255, 0.55);
+  fill: rgba(0, 240, 255, 0.5);
   text-anchor: middle;
   dominant-baseline: middle;
 }
 
 .compass-label.north {
   fill: var(--accent-cyan);
-  filter: drop-shadow(0 0 3px rgba(0, 240, 255, 0.6));
   font-weight: 900;
-  font-size: 11px;
+  font-size: 10px;
 }
 
 /* Plane Trails */
@@ -147,8 +131,7 @@ html, body {
   stroke: var(--accent-cyan);
   stroke-width: 2.5;
   stroke-linecap: round;
-  stroke-dasharray: 1 6; /* dot grid trail */
-  transition: opacity 0.1s linear;
+  stroke-dasharray: 1 5;
 }
 
 /* Secondary Targets */
@@ -156,20 +139,18 @@ html, body {
   fill: var(--accent-cyan);
   stroke: #ffffff;
   stroke-width: 0.5;
-  opacity: 0.75;
-  filter: drop-shadow(0 0 3px var(--accent-cyan));
+  filter: drop-shadow(0 0 2px var(--accent-cyan));
 }
 
 .secondary-target-label {
   font-family: var(--font-hud);
   font-size: 7px;
   font-weight: 700;
-  fill: rgba(255, 255, 255, 0.85);
+  fill: rgba(255, 255, 255, 0.8);
   text-anchor: middle;
-  filter: drop-shadow(0 1px 2px #000);
 }
 
-/* Selected Locked Target - Static and High-Visibility */
+/* Selected Locked Target */
 .target-group {
   transition: transform 0.05s linear;
   will-change: transform;
@@ -177,7 +158,6 @@ html, body {
 
 .target-point {
   fill: var(--accent-amber);
-  filter: drop-shadow(0 0 6px var(--accent-amber));
   stroke: #ffffff;
   stroke-width: 0.75;
 }
@@ -186,7 +166,6 @@ html, body {
   fill: none;
   stroke: var(--accent-amber);
   stroke-width: 1.5;
-  filter: drop-shadow(0 0 3px var(--accent-amber));
 }
 
 .target-cross {
@@ -201,8 +180,6 @@ html, body {
   transform: rotate(var(--arrow-angle, 0deg));
   transform-origin: center;
   pointer-events: none;
-  transition: transform 0.1s linear;
-  will-change: transform;
   z-index: 3;
 }
 
@@ -214,36 +191,33 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 
 .arrow-svg {
-  width: min(32px, 6vw);
-  height: min(32px, 6vw);
+  width: 30px;
+  height: 30px;
   overflow: visible;
 }
 
 .arrow-shape {
   fill: var(--accent-cyan);
-  filter: drop-shadow(0 0 8px var(--accent-cyan));
   stroke: #ffffff;
   stroke-width: 1.5;
   stroke-linejoin: round;
+  filter: drop-shadow(0 0 6px var(--accent-cyan));
 }
 
 .arrow-bearing-label {
   font-family: var(--font-hud);
-  font-size: min(12px, 2.2vw);
+  font-size: 12px;
   font-weight: 900;
   color: var(--accent-cyan);
   background-color: #000000;
-  padding: 2px 6px;
+  padding: 2px 5px;
   border: 1.5px solid var(--accent-cyan);
   border-radius: 4px;
-  text-shadow: 0 0 4px rgba(0, 240, 255, 0.6);
   transform: rotate(calc(-1 * var(--arrow-angle, 0deg) - 90deg));
-  will-change: transform;
-  filter: drop-shadow(0 2px 5px rgba(0,0,0,0.8));
 }
 
 /* Scanning visualization when idle */
@@ -256,14 +230,13 @@ html, body {
   justify-content: center;
   z-index: 2;
   border-radius: 50%;
-  overflow: hidden;
 }
 
 .scanning-ripple {
   position: absolute;
   width: 100%;
   height: 100%;
-  border: 1.5px solid rgba(0, 240, 255, 0.2);
+  border: 1.5px solid rgba(0, 240, 255, 0.15);
   border-radius: 50%;
   transform: scale(0.1);
   animation: scan-ripple 4s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
@@ -271,88 +244,75 @@ html, body {
 
 @keyframes scan-ripple {
   0% { transform: scale(0.1); opacity: 0.8; }
-  50% { opacity: 0.4; }
   100% { transform: scale(0.96); opacity: 0; }
 }
 
 .scanning-text {
-  font-size: clamp(16px, 2.5vw, 24px);
+  font-size: 18px;
   color: var(--accent-cyan);
   font-weight: 700;
-  animation: pulse-opacity 2s ease-in-out infinite;
-  text-shadow: 0 0 10px rgba(0, 240, 255, 0.6);
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
 }
 
-@keyframes pulse-opacity {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
-}
-
-/* Right Panel: Information Dashboard - Clean & Packed */
+/* Right Panel: Information Dashboard - Clean Flow Layout */
 .info-panel {
-  display: grid;
-  grid-template-rows: 1fr auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   height: 100vh;
-  padding: 4.5vh 4vw;
-  background-color: var(--bg-color);
+  padding: 30px;
   border-left: 1px solid var(--border-color);
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 /* Stats Card Panel */
 .stats-card {
+  flex-grow: 1;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
-  padding-top: 1.5vh;
-  min-height: 0;
+  justify-content: center;
+  margin-bottom: 25px;
 }
 
 .flight-data {
   display: flex;
   flex-direction: column;
-  gap: 4vh;
-  margin-top: auto;
-  margin-bottom: auto;
+  gap: 25px;
   width: 100%;
 }
 
 .flight-identity {
   display: flex;
   flex-direction: column;
-  gap: 0.7vh;
+  gap: 5px;
 }
 
 .airline-name {
-  font-size: clamp(14px, 1.8vw, 20px);
+  font-size: clamp(14px, 1.8vw, 18px);
   font-weight: 700;
   text-transform: uppercase;
   color: var(--accent-cyan);
-  text-shadow: 0 0 4px rgba(0, 240, 255, 0.3);
 }
 
 .flight-callsign {
-  font-size: clamp(60px, 8.5vw, 100px);
+  font-size: clamp(52px, 7vw, 84px);
   line-height: 1.1;
   font-weight: 900;
   color: #ffffff;
-  letter-spacing: -0.03em;
-  padding: 2px 0;
+  letter-spacing: -0.02em;
 }
 
 .aircraft-type {
-  font-size: clamp(18px, 2.2vw, 26px);
-  color: rgba(255, 255, 255, 0.85);
-  font-weight: 400;
+  font-size: clamp(16px, 2vw, 22px);
+  color: rgba(255, 255, 255, 0.8);
 }
 
 /* Route Display (SFO -> SEA) */
 .route-display {
   background-color: #0c121c;
   border: 1.5px solid var(--border-color);
-  border-radius: 10px;
-  padding: 2.2vh 2vw;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  border-radius: 8px;
+  padding: 15px 20px;
 }
 
 .route-airports {
@@ -367,17 +327,15 @@ html, body {
 }
 
 .airport-code {
-  font-size: clamp(30px, 4vw, 52px);
+  font-size: clamp(24px, 3.2vw, 42px);
   font-weight: 900;
   line-height: 1;
-  color: #ffffff;
 }
 
 .airport-name {
-  font-size: clamp(13px, 1.6vw, 18px);
-  color: rgba(255, 255, 255, 0.7);
-  font-weight: 500;
-  margin-top: 3px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 2px;
 }
 
 .route-connector {
@@ -386,7 +344,7 @@ html, body {
   align-items: center;
   justify-content: center;
   position: relative;
-  padding: 0 20px;
+  padding: 0 15px;
 }
 
 .connector-line {
@@ -397,11 +355,10 @@ html, body {
 
 .connector-icon {
   position: absolute;
-  font-size: 18px;
+  font-size: 16px;
   color: var(--accent-cyan);
   transform: rotate(90deg);
   animation: plane-fly-slow 8s linear infinite;
-  text-shadow: 0 0 8px var(--accent-cyan);
 }
 
 @keyframes plane-fly-slow {
@@ -414,29 +371,28 @@ html, body {
 .metrics-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2.2vh 2vw;
+  gap: 15px;
 }
 
 .metric-box {
   background-color: #0c121c;
   border: 1.5px solid var(--border-color);
-  border-radius: 10px;
-  padding: 2.2vh 2.2vw;
+  border-radius: 8px;
+  padding: 15px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  min-height: 110px; /* fixed compact height to stop box resizing */
+  gap: 4px;
 }
 
 .metric-box.highlighted {
   border-color: var(--accent-amber);
-  box-shadow: 0 0 20px rgba(255, 183, 3, 0.1);
+  box-shadow: 0 0 15px rgba(255, 183, 3, 0.1);
 }
 
 .metric-label {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .metric-value-row {
@@ -447,50 +403,46 @@ html, body {
 }
 
 .metric-value {
-  font-size: clamp(28px, 3.8vw, 48px);
+  font-size: clamp(24px, 3.5vw, 36px);
   font-weight: 900;
-  line-height: 1;
-  font-variant-numeric: tabular-nums; /* stops width jitter */
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .metric-box.highlighted .metric-value {
   color: var(--accent-amber);
-  text-shadow: 0 0 10px rgba(255, 183, 3, 0.4);
 }
 
 .metric-unit {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 800;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .metric-subtext {
-  font-size: 14px;
+  font-size: 12px;
   color: #ffffff;
   font-weight: 600;
-  margin-top: 4px;
+  margin-top: 2px;
   text-transform: uppercase;
-  white-space: nowrap; /* stops word wrap height shifting */
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .trend-icon {
-  font-size: 18px;
+  font-size: 16px;
   color: #10b981;
   margin-left: auto;
-  text-shadow: 0 0 6px #10b981;
 }
 
 /* Signal update timer */
 .signal-age {
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.45);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
   text-align: right;
-  margin-top: -1vh;
-  letter-spacing: 0.05em;
+  margin-top: -5px;
 }
 
 /* No Flight State */
@@ -500,31 +452,31 @@ html, body {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 6vh 2vw;
-  border: 2px dashed var(--border-color);
-  border-radius: 10px;
-  background-color: rgba(4, 6, 10, 0.6);
+  padding: 40px 20px;
+  border: 1.5px dashed var(--border-color);
+  border-radius: 8px;
+  background-color: rgba(4, 6, 10, 0.5);
   margin: auto;
   width: 100%;
 }
 
 .no-flight-card h2 {
-  font-size: 22px;
+  font-size: 18px;
   color: #ffffff;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .no-flight-card p {
-  font-size: 15px;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .sonar-wave {
-  width: 120px;
-  height: 120px;
+  width: 80px;
+  height: 80px;
   border: 1.5px solid var(--border-color);
   border-radius: 50%;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
   position: relative;
   animation: pulse-sonar 2s infinite ease-out;
 }
@@ -538,25 +490,23 @@ html, body {
 .nearby-panel {
   display: flex;
   flex-direction: column;
-  gap: 1.8vh;
-  border-top: 1.5px solid var(--border-color);
-  padding-top: 3vh;
-  min-height: 0;
+  gap: 10px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 20px;
 }
 
 .panel-subtitle {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.6);
-  font-weight: 800;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 700;
 }
 
 .nearby-list {
   display: flex;
   flex-direction: column;
-  gap: 1vh;
-  overflow-y: auto;
+  gap: 8px;
   max-height: 25vh;
-  padding-right: 5px;
+  overflow-y: auto;
 }
 
 /* Custom Scrollbar for list */
@@ -577,17 +527,11 @@ html, body {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  background-color: rgba(255, 255, 255, 0.03);
+  background-color: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 1.4vh 1.8vw;
-  font-size: 14px;
-  transition: all 0.2s ease;
-}
-
-.nearby-row:hover {
-  background-color: rgba(0, 240, 255, 0.04);
-  border-color: rgba(0, 240, 255, 0.4);
+  border-radius: 6px;
+  padding: 10px 15px;
+  font-size: 13px;
 }
 
 .nearby-callsign {
@@ -596,8 +540,8 @@ html, body {
 }
 
 .nearby-route {
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
   text-align: center;
 }
 
@@ -605,7 +549,7 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .nearby-dist {
@@ -614,16 +558,16 @@ html, body {
 }
 
 .nearby-alt {
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .nearby-empty {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.3);
   text-align: center;
-  padding: 2.5vh 0;
-  border: 1px dashed rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  padding: 15px 0;
+  border: 1px dashed rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
 }
 
 /* System Disconnected overlay styling */
@@ -635,36 +579,33 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(10px);
 }
 
 .error-box {
-  background-color: rgba(25, 10, 10, 0.9);
+  background-color: rgba(20, 10, 10, 0.9);
   border: 2px solid #ef4444;
-  border-radius: 10px;
-  padding: 40px;
+  border-radius: 8px;
+  padding: 30px;
   text-align: center;
-  box-shadow: 0 0 40px rgba(239, 68, 68, 0.25);
-  max-width: 450px;
+  max-width: 400px;
 }
 
 .error-box h2 {
   color: #ef4444;
-  font-size: 22px;
-  margin-bottom: 12px;
-  text-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+  font-size: 20px;
+  margin-bottom: 10px;
 }
 
 .error-box p {
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 15px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
 }
 
 /* Responsive adjustment (Portrait screens) */
 @media (max-width: 900px) {
   .app-container {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr 1.2fr;
+    grid-template-rows: auto;
     height: auto;
     overflow-y: auto;
   }
@@ -672,7 +613,7 @@ html, body {
   .radar-panel {
     border-right: none;
     border-bottom: 1px solid var(--border-color);
-    padding: 6vw;
+    padding: 30px 20px;
   }
   
   .radar-aspect-box {
@@ -682,45 +623,10 @@ html, body {
   .info-panel {
     border-left: none;
     height: auto;
-    padding: 6vw;
+    padding: 30px 20px;
   }
   
   .nearby-list {
     max-height: none;
-  }
-}
-
-/* Height constraints for smaller browser window heights (prevents vertical layout overflow) */
-@media (max-height: 850px) {
-  .info-panel {
-    padding: 3vh 3vw;
-  }
-  .flight-data {
-    gap: 2.5vh;
-  }
-  .flight-callsign {
-    font-size: clamp(48px, 6.5vw, 76px);
-  }
-  .aircraft-type {
-    font-size: clamp(15px, 1.8vw, 20px);
-  }
-  .metric-value {
-    font-size: clamp(22px, 3vw, 36px);
-  }
-  .metric-box {
-    padding: 1.6vh 1.8vw;
-    min-height: 96px;
-  }
-  .route-display {
-    padding: 1.5vh 2vw;
-  }
-  .airport-code {
-    font-size: clamp(24px, 3.2vw, 38px);
-  }
-  .nearby-panel {
-    padding-top: 2vh;
-  }
-  .nearby-list {
-    max-height: 18vh;
   }
 }
