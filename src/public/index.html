@@ -1,16 +1,195 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Window Plane</title>
+    <meta name="description" content="Ceiling projected ADS-B aircraft HUD and radar tracking system." />
+    <title>Window Plane HUD</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-    <main id="app">
-      <div id="status"></div>
-      <section id="aircraft"></section>
-    </main>
+    <div id="app" class="app-container">
+      <!-- Radar Screen (Left/Center component) -->
+      <div class="radar-panel">
+        <div class="radar-aspect-box">
+          <div id="radar" class="radar">
+            <!-- Sweep effect element -->
+            <div class="radar-sweep"></div>
+            
+            <!-- Radar SVG Grid -->
+            <svg id="radar-grid" class="radar-grid" viewBox="-150 -150 300 300">
+              <!-- Radial rings -->
+              <circle r="40" class="grid-ring ring-inner" />
+              <circle r="90" class="grid-ring ring-mid" />
+              <circle r="140" class="grid-ring ring-outer" />
+              
+              <!-- Crosshairs -->
+              <line x1="-140" y1="0" x2="140" y2="0" class="grid-axis" />
+              <line x1="0" y1="-140" x2="0" y2="140" class="grid-axis" />
+              
+              <!-- Angle ticks -->
+              <g class="grid-ticks">
+                <line x1="0" y1="-140" x2="0" y2="-135" transform="rotate(30)" class="grid-tick" />
+                <line x1="0" y1="-140" x2="0" y2="-135" transform="rotate(60)" class="grid-tick" />
+                <line x1="0" y1="-140" x2="0" y2="-135" transform="rotate(120)" class="grid-tick" />
+                <line x1="0" y1="-140" x2="0" y2="-135" transform="rotate(150)" class="grid-tick" />
+                <line x1="0" y1="-140" x2="0" y2="-135" transform="rotate(210)" class="grid-tick" />
+                <line x1="0" y1="-140" x2="0" y2="-135" transform="rotate(240)" class="grid-tick" />
+                <line x1="0" y1="-140" x2="0" y2="-135" transform="rotate(300)" class="grid-tick" />
+                <line x1="0" y1="-140" x2="0" y2="-135" transform="rotate(330)" class="grid-tick" />
+              </g>
+
+              <!-- Rotatable Compass Group (calibrated to DOWN_BEARING_DEG) -->
+              <g id="compass-group" class="compass-group">
+                <!-- Cardinal points -->
+                <text x="0" y="-144" class="compass-label north">N</text>
+                <text x="144" y="3" class="compass-label east">E</text>
+                <text x="0" y="150" class="compass-label south">S</text>
+                <text x="-150" y="3" class="compass-label west">W</text>
+              </g>
+
+              <!-- Historic trail path -->
+              <path id="plane-trail" class="plane-trail" d="" />
+
+              <!-- Target indicators (glowing locked target) -->
+              <g id="target-group" class="target-group hidden">
+                <circle id="target-point" r="4" class="target-point" />
+                <circle id="target-ring" r="8" class="target-ring" />
+                <line id="target-line-x1" x1="-12" y1="0" x2="-6" y2="0" class="target-cross" />
+                <line id="target-line-x2" x1="6" y1="0" x2="12" y2="0" class="target-cross" />
+                <line id="target-line-y1" x1="0" y1="-12" x2="0" y2="-6" class="target-cross" />
+                <line id="target-line-y2" x1="0" y1="6" x2="0" y2="12" class="target-cross" />
+              </g>
+            </svg>
+
+            <!-- Outer Tracking Arrow (orbits radar bounds) -->
+            <div id="radar-arrow-orbit" class="radar-arrow-orbit hidden">
+              <div class="radar-arrow">
+                <svg viewBox="0 0 40 40" class="arrow-svg">
+                  <path d="M20,5 L35,28 L20,20 L5,28 Z" class="arrow-shape" />
+                </svg>
+                <div id="arrow-bearing-label" class="arrow-bearing-label">000°</div>
+              </div>
+            </div>
+            
+            <!-- Scanning Overlay -->
+            <div id="scanning-overlay" class="scanning-overlay">
+              <div class="scanning-ripple"></div>
+              <div class="scanning-text font-hud">SCANNING SKY...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Info Panel (Right side layout) -->
+      <div class="info-panel">
+        <header class="panel-header">
+          <div class="logo-area">
+            <span class="logo-icon">✈</span>
+            <span class="logo-text font-hud">WINDOW PLANE</span>
+          </div>
+          <div id="system-status" class="system-status font-hud">FEED ONLINE</div>
+        </header>
+
+        <!-- Main plane stats card -->
+        <main class="stats-card">
+          <!-- Shown when a plane is active -->
+          <div id="flight-data" class="flight-data hidden">
+            <div class="flight-identity">
+              <div id="airline-name" class="airline-name font-hud font-muted">ALASKA AIRLINES</div>
+              <h1 id="flight-callsign" class="flight-callsign font-hud">ASA611</h1>
+              <div id="aircraft-type" class="aircraft-type">Boeing 737 MAX 9</div>
+            </div>
+
+            <!-- Route visualizer -->
+            <div id="route-display" class="route-display hidden">
+              <div class="route-airports">
+                <div class="airport-block">
+                  <span id="route-origin-code" class="airport-code font-hud">SFO</span>
+                  <span id="route-origin-name" class="airport-name">San Francisco</span>
+                </div>
+                <div class="route-connector">
+                  <div class="connector-line"></div>
+                  <span class="connector-icon">✈</span>
+                </div>
+                <div class="airport-block">
+                  <span id="route-destination-code" class="airport-code font-hud">SEA</span>
+                  <span id="route-destination-name" class="airport-name">Seattle</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Grid of metrics -->
+            <div class="metrics-grid">
+              <div class="metric-box">
+                <div class="metric-label font-hud">ALTITUDE</div>
+                <div class="metric-value-row">
+                  <span id="metric-altitude" class="metric-value font-hud">4,200</span>
+                  <span class="metric-unit">FT</span>
+                  <span id="vertical-trend-icon" class="trend-icon">▲</span>
+                </div>
+                <div id="metric-vertical-rate" class="metric-subtext">+640 FPM</div>
+              </div>
+
+              <div class="metric-box highlighted">
+                <div class="metric-label font-hud">DISTANCE</div>
+                <div class="metric-value-row">
+                  <span id="metric-distance" class="metric-value font-hud">4.8</span>
+                  <span class="metric-unit">KM</span>
+                </div>
+                <div id="metric-elevation" class="metric-subtext">32° ELEVATION</div>
+              </div>
+
+              <div class="metric-box">
+                <div class="metric-label font-hud">SPEED</div>
+                <div class="metric-value-row">
+                  <span id="metric-speed" class="metric-value font-hud">408</span>
+                  <span class="metric-unit">KM/H</span>
+                </div>
+                <div id="metric-speed-kt" class="metric-subtext">220 KNOTS</div>
+              </div>
+
+              <div class="metric-box">
+                <div class="metric-label font-hud">BEARING</div>
+                <div class="metric-value-row">
+                  <span id="metric-bearing" class="metric-value font-hud">134</span>
+                  <span class="metric-unit">DEG</span>
+                </div>
+                <div id="metric-bearing-direction" class="metric-subtext">SOUTHEAST</div>
+              </div>
+            </div>
+
+            <div id="signal-age" class="signal-age">UPDATED 0.4S AGO</div>
+          </div>
+
+          <!-- Empty state when no plane is locked -->
+          <div id="no-flight-card" class="no-flight-card">
+            <div class="sonar-wave"></div>
+            <h2 class="font-hud">NO SELECTABLE TARGETS</h2>
+            <p>Waiting for aircraft to enter the airspace (<span id="max-dist-limit">10</span> km range)</p>
+          </div>
+        </main>
+
+        <!-- Nearby aircraft listing -->
+        <footer class="nearby-panel">
+          <h3 class="panel-subtitle font-hud">NEARBY AIRSPACE</h3>
+          <div id="nearby-list" class="nearby-list">
+            <div class="nearby-empty">No other planes detected</div>
+          </div>
+        </footer>
+      </div>
+      
+      <!-- General Error Overlay -->
+      <div id="error-overlay" class="error-overlay hidden">
+        <div class="error-box">
+          <h2 class="font-hud">SYSTEM DISCONNECT</h2>
+          <p id="error-message">Unable to query local readsb receiver feed.</p>
+        </div>
+      </div>
+    </div>
 
     <script src="/app.js" defer></script>
   </body>

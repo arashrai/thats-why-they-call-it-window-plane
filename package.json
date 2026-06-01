@@ -1,8 +1,14 @@
 {
   "name": "window-plane",
   "version": "0.1.0",
+  "description": "Ceiling projected ADS-B aircraft HUD and radar tracking system.",
   "private": true,
   "type": "module",
+  "author": "Arash Rai",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js"

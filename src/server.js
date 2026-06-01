@@ -186,6 +186,116 @@ function getAircraftType(a) {
   return AIRCRAFT_TYPES[typeCode] || typeCode;
 }
 
+const CACHE_FILE = path.join(process.cwd(), "data/routes-cache.json");
+let routeCache = {};
+const fetchInProgress = new Set();
+
+const CACHE_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const NOT_FOUND_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function cleanExpiredCacheEntries() {
+  const now = Date.now();
+  let modified = false;
+  for (const [key, value] of Object.entries(routeCache)) {
+    const timestamp = value.timestamp || 0;
+    const age = now - timestamp;
+    if (value.notFound) {
+      if (age > NOT_FOUND_EXPIRY_MS) {
+        delete routeCache[key];
+        modified = true;
+      }
+    } else {
+      if (age > CACHE_EXPIRY_MS) {
+        delete routeCache[key];
+        modified = true;
+      }
+    }
+  }
+  if (modified) {
+    console.log("[CACHE] Evicted expired cache entries.");
+    saveRouteCache();
+  }
+}
+
+async function initRouteCache() {
+  try {
+    await fs.mkdir(path.dirname(CACHE_FILE), { recursive: true });
+    const data = await fs.readFile(CACHE_FILE, "utf8");
+    routeCache = JSON.parse(data);
+    console.log(`[CACHE] Loaded ${Object.keys(routeCache).length} cached flight routes.`);
+    cleanExpiredCacheEntries();
+  } catch (err) {
+    if (err.code !== "ENOENT") {
+      console.error("[CACHE] Error reading routes cache:", err);
+    } else {
+      console.log("[CACHE] No routes cache file found. Starting empty.");
+    }
+  }
+}
+
+async function saveRouteCache() {
+  try {
+    await fs.mkdir(path.dirname(CACHE_FILE), { recursive: true });
+    await fs.writeFile(CACHE_FILE, JSON.stringify(routeCache, null, 2), "utf8");
+  } catch (err) {
+    console.error("[CACHE] Error saving routes cache:", err);
+  }
+}
+
+function triggerRouteLookup(callsign) {
+  if (!callsign) return;
+  const cleanCallsign = callsign.trim().toUpperCase().replace(/\s+/g, "");
+  if (!cleanCallsign) return;
+
+  if (routeCache[cleanCallsign] || fetchInProgress.has(cleanCallsign)) {
+    return;
+  }
+
+  fetchInProgress.add(cleanCallsign);
+  console.log(`[API] Fetching route info for callsign: ${cleanCallsign}`);
+
+  fetch(`https://api.adsbdb.com/v0/callsign/${cleanCallsign}`)
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      return res.json();
+    })
+    .then((data) => {
+      const routeInfo = data?.response?.flightroute || null;
+      if (routeInfo) {
+        routeCache[cleanCallsign] = {
+          airline: routeInfo.airline?.name || null,
+          origin: routeInfo.origin ? {
+            code: routeInfo.origin.iata_code || routeInfo.origin.icao_code || null,
+            name: routeInfo.origin.municipality || routeInfo.origin.name || null,
+            airport: routeInfo.origin.name || null
+          } : null,
+          destination: routeInfo.destination ? {
+            code: routeInfo.destination.iata_code || routeInfo.destination.icao_code || null,
+            name: routeInfo.destination.municipality || routeInfo.destination.name || null,
+            airport: routeInfo.destination.name || null
+          } : null,
+          timestamp: Date.now()
+        };
+        console.log(`[API] Successfully cached route for ${cleanCallsign}: ${routeCache[cleanCallsign].origin?.code} -> ${routeCache[cleanCallsign].destination?.code}`);
+      } else {
+        routeCache[cleanCallsign] = {
+          notFound: true,
+          timestamp: Date.now()
+        };
+        console.log(`[API] Route for ${cleanCallsign} not found in ADSBDB.`);
+      }
+      saveRouteCache();
+    })
+    .catch((err) => {
+      console.error(`[API] Error fetching route for ${cleanCallsign}:`, err.message);
+    })
+    .finally(() => {
+      fetchInProgress.delete(cleanCallsign);
+    });
+}
+
 function bearingToUiAngleDeg(bearingFromHomeDeg) {
   if (bearingFromHomeDeg == null) return 90;
 
@@ -246,6 +356,13 @@ function enrichAircraft(a) {
 
   const elev = elevationAngleDeg(distanceNm, altitudeFt, HOME.elevationFt);
 
+  const cleanCallsign = a.flight?.trim().toUpperCase().replace(/\s+/g, "") || null;
+  const route = cleanCallsign ? routeCache[cleanCallsign] : null;
+
+  if (cleanCallsign && !route) {
+    triggerRouteLookup(cleanCallsign);
+  }
+
   const enriched = {
     hex: a.hex,
     callsign: a.flight?.trim() || null,
@@ -263,7 +380,12 @@ function enrichAircraft(a) {
     distanceKm,
     bearingFromHomeDeg,
     elevationAngleDeg: elev,
-    uiAngleDeg: bearingToUiAngleDeg(bearingFromHomeDeg)
+    uiAngleDeg: bearingToUiAngleDeg(bearingFromHomeDeg),
+    route: (route && !route.notFound) ? {
+      airline: route.airline,
+      origin: route.origin,
+      destination: route.destination
+    } : null
   };
 
   enriched.isSelectable = isSelectableAircraft(enriched);
@@ -289,13 +411,24 @@ app.get("/api/aircraft", async (_req, res) => {
       });
 
     const selected = aircraft.find((a) => a.isSelectable) || null;
+    const nearby = aircraft
+      .filter((a) => a.hex !== (selected ? selected.hex : null))
+      .slice(0, 5);
 
     res.json({
       now: data.now,
       total: data.aircraft?.length ?? 0,
       maxDistanceKm: HOME.maxDistanceKm,
       selected,
-      aircraft
+      nearby,
+      aircraft,
+      config: {
+        homeLat: HOME.lat,
+        homeLon: HOME.lon,
+        homeElevationFt: HOME.elevationFt,
+        downBearingDeg: HOME.downBearingDeg,
+        bearingToUiScale: HOME.bearingToUiScale
+      }
     });
   } catch (err) {
     res.status(500).json({
@@ -306,7 +439,9 @@ app.get("/api/aircraft", async (_req, res) => {
   }
 });
 
-app.listen(port, "0.0.0.0", () => {
-  console.log(`Window Plane running at http://0.0.0.0:${port}`);
-  console.log(`Reading aircraft from ${aircraftJsonPath}`);
+initRouteCache().then(() => {
+  app.listen(port, "0.0.0.0", () => {
+    console.log(`Window Plane running at http://0.0.0.0:${port}`);
+    console.log(`Reading aircraft from ${aircraftJsonPath}`);
+  });
 });

@@ -1,419 +1,138 @@
-# That's Why They Call It Window Plane
+# That's Why They Call It Window Plane ✈️
 
-A local-first aircraft HUD for showing nearby planes using a Raspberry Pi and RTL-SDR dongle.
+A local-first, premium aircraft HUD and radar tracking system designed to run on a Raspberry Pi 5 with a projector displaying aircraft movements on your ceiling.
 
-This project receives ADS-B aircraft broadcasts locally, decodes them with `readsb`, and serves a custom web UI from the Raspberry Pi.
+Perfect for flats and high-rise apartments to visually track and catalog aircraft flying overhead in real time.
 
-## Current setup
+---
 
-This README covers the stable base setup:
+## Key Features
 
-- Raspberry Pi is reachable over SSH
-- RTL-SDR dongle is detected
-- `readsb` is running
-- `tar1090` is available as a local debug map
-- The custom Window Plane app can be run manually
+- **Buttery Smooth 60fps Interpolation**: Uses client-side dead reckoning based on reported speed, track heading, and vertical rates to slide the target reticle and tracking chevron continuously between server updates.
+- **Dynamic Flight Route Lookups**: Automatically fetches carrier names, origin, and destination airports (e.g., `SFO ➔ SEA`) via the ADSBDB API and caches them locally to ensure instant load times and zero network congestion.
+- **Rotatable Compass Calibration**: Automatically aligns North, East, South, and West to match your room's physical orientation using simple configuration settings.
+- **Projector-Optimized Aesthetics**: Designed with a pure black (`#000000`) background to eliminate light leakage on your ceiling, detailed with high-contrast glowing cyan and amber elements.
+- **Live Local Airspace Feed**: Tracks nearby planes entering the airspace, including climb/descent trend states and elevation angles.
+- **Developer Simulation Mode**: Includes an offline aircraft simulator to build and test the HUD features directly on your laptop without needing an active SDR receiver.
 
-## Hardware
+---
 
-Required:
+## Hardware Requirements
 
-- Raspberry Pi 5
-- microSD card with Raspberry Pi OS Lite 64-bit
-- USB-C power supply for Raspberry Pi
-- RTL-SDR Blog dongle or compatible RTL2832U SDR
-- 1090 MHz antenna or adjustable RTL-SDR dipole antenna
-- Optional: USB-A extension cable for better antenna placement
+- **Raspberry Pi 5** (Runs on Raspberry Pi OS Lite 64-bit)
+- **RTL-SDR USB Dongle** (e.g., RTL-SDR Blog V3/V4 or generic RTL2832U)
+- **1090 MHz Antenna** (positioned vertically near a window)
+- **Ceiling Projector** (connected to the Pi's micro-HDMI port)
 
-Physical ADS-B connection:
+---
 
-```text
-Antenna
-  ↓
-RTL-SDR dongle
-  ↓ USB-A / USB extension
-Raspberry Pi
-  ↓ Wi-Fi
-Local web UI
-```
+## Quick Installation on Raspberry Pi
 
-For ADS-B at 1090 MHz, start with the antenna vertical near a window.
-
-If using a dipole kit, set each antenna arm to roughly:
-
-```text
-~2.7 inches / ~6.9 cm per side
-```
-
-## Raspberry Pi OS setup
-
-Use Raspberry Pi Imager.
-
-Recommended settings:
-
-```text
-Device: Raspberry Pi 5
-OS: Raspberry Pi OS Lite 64-bit
-Hostname: windowplane
-Username: arash
-Enable SSH: yes
-SSH password authentication: yes
-Wi-Fi: main home Wi-Fi, not guest Wi-Fi
-Wireless LAN country: US
-Timezone: America/Los_Angeles
-Raspberry Pi Connect: disabled
-```
-
-After flashing, boot the Pi and wait 1–2 minutes.
-
-SSH in from a Mac:
+Copy this repository to your Pi and run the master setup script, which handles base software, receiver dependencies, kiosk display configuration, and autostart scripts:
 
 ```bash
-ssh arash@windowplane.local
-```
-
-If the Pi was reflashed and macOS complains that the host key changed:
-
-```bash
-ssh-keygen -R windowplane.local
-ssh-keygen -R windowplane.lan
-ssh-keygen -R windowplane
-```
-
-Then retry:
-
-```bash
-ssh arash@windowplane.local
-```
-
-## First network checkpoint
-
-Before installing anything else, confirm SSH and Wi-Fi are healthy:
-
-```bash
-hostname
-hostname -I
-iwgetid
-sudo systemctl status ssh --no-pager
-```
-
-Expected:
-
-```text
-hostname       → windowplane
-hostname -I    → 192.168.86.xxx or similar
-iwgetid        → main Wi-Fi SSID
-ssh.service    → active (running)
-```
-
-Reboot once and confirm SSH still works:
-
-```bash
-sudo reboot
-```
-
-After 60–90 seconds:
-
-```bash
-ssh arash@windowplane.local
-```
-
-Do not proceed until SSH survives a reboot.
-
-## System update
-
-```bash
-sudo apt update
-sudo apt upgrade -y
-sudo reboot
-```
-
-Reconnect:
-
-```bash
-ssh arash@windowplane.local
-```
-
-## Clone the repo
-
-```bash
-mkdir -p ~/projects
-cd ~/projects
 git clone https://github.com/arashrai/thats-why-they-call-it-window-plane.git
 cd thats-why-they-call-it-window-plane
+chmod +x setup.sh
+./setup.sh
 ```
 
-If the repo already exists:
+### Configuration
 
-```bash
-cd ~/projects/thats-why-they-call-it-window-plane
-git pull
+Edit the generated `.env` file in the root directory to set your home coordinates and calibrate the projection tracking:
+
+```env
+PORT=3000
+AIRCRAFT_JSON_PATH=/run/readsb/aircraft.json
+
+# Your location coordinates & elevation
+HOME_LAT=47.xxxxxx
+HOME_LON=-122.xxxxxx
+HOME_ELEVATION_FT=350
+
+# Max tracking distance (planes outside this range won't lock on)
+MAX_DISTANCE_KM=10
+MIN_ELEVATION_ANGLE_DEG=0
+MAX_ELEVATION_ANGLE_DEG=85
+
+# Projector Calibration
+# What bearing (0-360°) is straight down on your ceiling?
+# (e.g. if your window faces Southeast (120°), set this to 120)
+DOWN_BEARING_DEG=120
+
+# Scale factor for bearing rotation mapping
+BEARING_TO_UI_SCALE=1
 ```
 
-## Install base Pi dependencies
+---
 
-From the repo root:
+## Local Development & Simulation (Mac/Windows)
 
-```bash
-chmod +x scripts/*.sh
-./scripts/install-pi-deps.sh
-```
+You can run and test the HUD locally on your development machine using mock tracking vectors:
 
-This installs the base OS packages needed for the stable setup.
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
 
-## Test the RTL-SDR dongle
+2. **Start the simulated flight telemetry generator**:
+   ```bash
+   node scripts/simulate-aircraft.js
+   ```
 
-Plug in the RTL-SDR dongle.
+3. **Start the local server**:
+   ```bash
+   npm run dev
+   ```
 
-Check that the Pi sees it:
+4. Open your browser to [http://localhost:3000](http://localhost:3000). The radar will acquire simulated flights crossing the Seattle airspace and track them in real time.
 
-```bash
-lsusb
-```
+---
 
-You should see something like:
+## Architecture Overview
 
 ```text
-Realtek Semiconductor Corp. RTL2838 DVB-T
+       Aircraft ADS-B Broadcasts
+                 ↓ (1090 MHz)
+              Antenna
+                 ↓
+           RTL-SDR Dongle
+                 ↓ (USB)
+     readsb (decodes transmissions)
+                 ↓
+     /run/readsb/aircraft.json
+                 ↓
+     Window Plane Server (queries routes & caches)
+                 ↓ (HTTP / API)
+     Client Web UI (60fps dead-reckoned interpolation)
+                 ↓
+     Projector Display (Ceiling projection HUD)
 ```
 
-Test the dongle:
+## Useful Commands
+
+### Manage Services
+
+The setup script configures two services:
+- `windowplane.service` (manages the Node web server)
+- `windowplane-kiosk.service` (manages Cage compositor and Chromium display)
 
 ```bash
-rtl_test
+# Restart server
+sudo systemctl restart windowplane
+
+# View logs
+journalctl -u windowplane -f --no-pager
+journalctl -u windowplane-kiosk -f --no-pager
 ```
 
-If it works, stop it with:
+### Testing Receiver Hardware
 
-```text
-Ctrl+C
-```
-
-Important: only one process can use the SDR at a time. Stop `rtl_test` before starting `readsb`.
-
-## Install ADS-B stack
-
-From the repo root:
+If you need to verify that your SDR dongle is connected and readable by the system:
 
 ```bash
-./scripts/install-adsb-stack.sh
-```
-
-This installs:
-
-- `readsb`
-- `tar1090`
-
-Check `readsb`:
-
-```bash
-sudo systemctl status readsb --no-pager
-```
-
-Expected:
-
-```text
-active (running)
-```
-
-Check the aircraft JSON:
-
-```bash
-cat /run/readsb/aircraft.json | python3 -m json.tool | head -80
-```
-
-This file is the local aircraft feed used by the Window Plane app.
-
-## Open tar1090 debug map
-
-From a browser on your Mac:
-
-```text
-http://windowplane.local/tar1090/
-```
-
-This is not the custom Window Plane UI. It is a local debug map for verifying that aircraft reception works.
-
-## ADS-B checkpoint
-
-Confirm all of these work before continuing:
-
-```bash
-sudo systemctl status readsb --no-pager
-cat /run/readsb/aircraft.json | python3 -m json.tool | head -80
-```
-
-From a browser on your Mac:
-
-```text
-http://windowplane.local/tar1090/
-```
-
-Then reboot once:
-
-```bash
-sudo reboot
-```
-
-After reboot, confirm SSH and `tar1090` still work:
-
-```bash
-ssh arash@windowplane.local
-sudo systemctl status readsb --no-pager
-```
-
-Browser:
-
-```text
-http://windowplane.local/tar1090/
-```
-
-## Install app dependencies
-
-From the repo root:
-
-```bash
-npm install
-```
-
-## Run the app manually
-
-From the repo root:
-
-```bash
-npm start
-```
-
-From a browser on your Mac, open:
-
-```text
-http://windowplane.local:3000
-```
-
-You should see the Window Plane UI.
-
-To stop the manual server:
-
-```text
-Ctrl+C
-```
-
-## Current software architecture
-
-```text
-Aircraft ADS-B broadcasts
-  ↓
-1090 MHz antenna
-  ↓
-RTL-SDR dongle
-  ↓
-readsb
-  ↓
-/run/readsb/aircraft.json
-  ↓
-Window Plane Node app
-  ↓
-http://windowplane.local:3000
-```
-
-Debug map:
-
-```text
-http://windowplane.local/tar1090/
-```
-
-Custom app:
-
-```text
-http://windowplane.local:3000
-```
-
-## Useful commands
-
-Check network:
-
-```bash
-hostname
-hostname -I
-iwgetid
-```
-
-Check SSH:
-
-```bash
-sudo systemctl status ssh --no-pager
-```
-
-Check SDR:
-
-```bash
-rtl_test
-```
-
-If `rtl_test` says the device is busy, stop `readsb` first:
-
-```bash
+# Stop readsb temporarily so it releases the USB lock
 sudo systemctl stop readsb
 rtl_test
 sudo systemctl start readsb
 ```
-
-Check `readsb`:
-
-```bash
-sudo systemctl status readsb --no-pager
-journalctl -u readsb -n 100 --no-pager
-```
-
-Check aircraft JSON:
-
-```bash
-cat /run/readsb/aircraft.json | python3 -m json.tool | head -80
-```
-
-Restart `readsb`:
-
-```bash
-sudo systemctl restart readsb
-```
-
-Run app manually:
-
-```bash
-cd ~/projects/thats-why-they-call-it-window-plane
-npm start
-```
-
-## Development workflow
-
-Develop locally on Mac:
-
-```bash
-git add .
-git commit -m "Update Window Plane"
-git push
-```
-
-Pull on Pi:
-
-```bash
-ssh arash@windowplane.local
-cd ~/projects/thats-why-they-call-it-window-plane
-git pull
-npm install
-npm start
-```
-
-## Notes
-
-ADS-B provides local aircraft state such as:
-
-- callsign / flight number
-- altitude
-- speed
-- heading
-- latitude / longitude, when available
-- signal age
-- RSSI
-
-ADS-B does not generally provide origin/destination route information.
