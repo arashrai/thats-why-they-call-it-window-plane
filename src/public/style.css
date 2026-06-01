@@ -421,11 +421,11 @@ html, body {
   background-color: #0c121c;
   border: 1.5px solid var(--border-color);
   border-radius: 10px;
-  padding: 2.5vh 2.2vw;
+  padding: 2.2vh 2.2vw;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  min-height: 125px; /* fixed minimum height to stop box resizing */
+  min-height: 110px; /* fixed compact height to stop box resizing */
 }
 
 .metric-box.highlighted {
@@ -500,10 +500,12 @@ html, body {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 8vh 2vw;
+  padding: 6vh 2vw;
   border: 2px dashed var(--border-color);
   border-radius: 10px;
   background-color: rgba(4, 6, 10, 0.6);
+  margin: auto;
+  width: 100%;
 }
 
 .no-flight-card h2 {
@@ -685,5 +687,40 @@ html, body {
   
   .nearby-list {
     max-height: none;
+  }
+}
+
+/* Height constraints for smaller browser window heights (prevents vertical layout overflow) */
+@media (max-height: 850px) {
+  .info-panel {
+    padding: 3vh 3vw;
+  }
+  .flight-data {
+    gap: 2.5vh;
+  }
+  .flight-callsign {
+    font-size: clamp(48px, 6.5vw, 76px);
+  }
+  .aircraft-type {
+    font-size: clamp(15px, 1.8vw, 20px);
+  }
+  .metric-value {
+    font-size: clamp(22px, 3vw, 36px);
+  }
+  .metric-box {
+    padding: 1.6vh 1.8vw;
+    min-height: 96px;
+  }
+  .route-display {
+    padding: 1.5vh 2vw;
+  }
+  .airport-code {
+    font-size: clamp(24px, 3.2vw, 38px);
+  }
+  .nearby-panel {
+    padding-top: 2vh;
+  }
+  .nearby-list {
+    max-height: 18vh;
   }
 }
