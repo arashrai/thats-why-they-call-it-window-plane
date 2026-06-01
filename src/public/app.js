@@ -108,29 +108,34 @@ function lerpAngle(current, target, factor) {
   return current + diff * factor;
 }
 
-// Curved position interpolator accounting for turn rate
-function estimatePosition(plane, ageSec, turnRateDegPerSec = 0) {
-  if (plane.lat == null || plane.lon == null) return null;
+// Curved position interpolator accounting for turn rate, dead-reckoning from last known true state
+function estimatePositionFromState(state, now, groundSpeedKmh, verticalRateFpm) {
+  if (state.lastTrueLat == null || state.lastTrueLon == null) return null;
   
-  let estLat = plane.lat;
-  let estLon = plane.lon;
-  let estAlt = plane.altitudeFt;
+  const ageSec = Math.min(15, (now - state.lastTrueTime) / 1000);
   
-  if (plane.groundSpeedKmh != null && plane.trackDeg != null) {
-    const speedKms = plane.groundSpeedKmh / 3600;
-    const trackRad = degToRad(plane.trackDeg);
+  let estLat = state.lastTrueLat;
+  let estLon = state.lastTrueLon;
+  let estAlt = state.lastTrueAlt;
+  
+  const speed = groundSpeedKmh || 0;
+  const track = state.lastTrueTrack;
+  
+  if (speed > 0 && track != null) {
+    const speedKms = speed / 3600;
+    const trackRad = degToRad(track);
     
     let dLatKm = 0;
     let dLonKm = 0;
 
-    if (Math.abs(turnRateDegPerSec) < 0.05) {
+    if (Math.abs(state.turnRateDegPerSec) < 0.05) {
       // Straight line approximation
       const distanceKm = speedKms * ageSec;
       dLatKm = distanceKm * Math.cos(trackRad);
       dLonKm = distanceKm * Math.sin(trackRad);
     } else {
       // Curved path kinematics
-      const turnRateRad = degToRad(turnRateDegPerSec);
+      const turnRateRad = degToRad(state.turnRateDegPerSec);
       const vOverW = speedKms / turnRateRad;
       const endTrackRad = trackRad + turnRateRad * ageSec;
       
@@ -141,14 +146,14 @@ function estimatePosition(plane, ageSec, turnRateDegPerSec = 0) {
     // 1 degree latitude = 111.32 km
     const dLat = dLatKm / 111.32;
     // 1 degree longitude = 111.32 * cos(lat) km
-    const dLon = dLonKm / (111.32 * Math.cos(degToRad(plane.lat)));
+    const dLon = dLonKm / (111.32 * Math.cos(degToRad(state.lastTrueLat)));
     
     estLat += dLat;
     estLon += dLon;
   }
   
-  if (plane.verticalRateFpm != null && estAlt != null) {
-    const altRateFps = plane.verticalRateFpm / 60;
+  if (verticalRateFpm != null && estAlt != null) {
+    const altRateFps = verticalRateFpm / 60;
     estAlt += altRateFps * ageSec;
   }
   
@@ -218,13 +223,15 @@ function updatePlaneStates(allPlanes) {
     
     let state = planeStates.get(plane.hex);
     if (!state) {
+      if (plane.lat == null || plane.lon == null) return; // Wait for valid position before tracking
+      
       state = {
         hex: plane.hex,
         lastTrueLat: plane.lat,
         lastTrueLon: plane.lon,
         lastTrueAlt: plane.altitudeFt,
         lastTrueTrack: plane.trackDeg,
-        lastTrueTime: now,
+        lastTrueTime: now - (plane.seenSec || 0) * 1000,
         turnRateDegPerSec: 0,
         smoothLat: plane.lat,
         smoothLon: plane.lon,
@@ -232,25 +239,30 @@ function updatePlaneStates(allPlanes) {
       };
       planeStates.set(plane.hex, state);
     } else {
-      let turnRate = 0;
-      if (state.lastTrueTrack != null && plane.trackDeg != null) {
-        const dt = (now - state.lastTrueTime) / 1000;
+      let turnRate = state.turnRateDegPerSec;
+      if (state.lastTrueTrack != null && plane.trackDeg != null && plane.trackDeg !== state.lastTrueTrack) {
+        const dt = ((now - (plane.seenSec || 0) * 1000) - state.lastTrueTime) / 1000;
         if (dt > 0.1 && dt < 5.0) {
           const diff = signedAngularDiffDeg(plane.trackDeg, state.lastTrueTrack);
           turnRate = diff / dt;
           if (Math.abs(turnRate) > 10) {
             turnRate = Math.sign(turnRate) * 10;
           }
-        } else {
-          turnRate = state.turnRateDegPerSec;
         }
       }
       
-      state.lastTrueLat = plane.lat;
-      state.lastTrueLon = plane.lon;
-      state.lastTrueAlt = plane.altitudeFt;
-      state.lastTrueTrack = plane.trackDeg;
-      state.lastTrueTime = now;
+      // Only update positions if they are actually present in the new packet
+      if (plane.lat != null && plane.lon != null) {
+        state.lastTrueLat = plane.lat;
+        state.lastTrueLon = plane.lon;
+        state.lastTrueTime = now - (plane.seenSec || 0) * 1000;
+      }
+      if (plane.altitudeFt != null) {
+        state.lastTrueAlt = plane.altitudeFt;
+      }
+      if (plane.trackDeg != null) {
+        state.lastTrueTrack = plane.trackDeg;
+      }
       state.turnRateDegPerSec = turnRate;
     }
   });
@@ -322,11 +334,11 @@ function renderLoop() {
     const state = planeStates.get(plane.hex);
     if (!state) return;
 
-    // Calculate age of the last true ADS-B measurement projected to the present moment
-    const planeAge = (plane.seenSec ?? 0) + elapsedSec;
-    
-    // Estimate raw projected position (using turn rate)
-    const estPos = estimatePosition(plane, planeAge, state.turnRateDegPerSec);
+    // Filter out stale planes that have not been seen for over 12 seconds
+    const isStale = (plane.seenSec ?? 0) > 12.0;
+
+    // Estimate raw projected position (using turn rate) from our last valid true state
+    const estPos = estimatePositionFromState(state, now, plane.groundSpeedKmh, plane.verticalRateFpm);
     if (!estPos) return;
 
     // Smoothly blend current state towards the projected target
@@ -359,23 +371,24 @@ function renderLoop() {
 
     // Handle Trail appending (use UNCLAMPED coordinates)
     let trail = flightTrails.get(plane.hex);
-    if (!trail) {
-      trail = { points: [], maxAge: 30000, active: true };
-      flightTrails.set(plane.hex, trail);
-    }
     
-    // Only keep trail active if the plane is within our max distance circle
+    // We want the trail to remain active as long as the plane is within range (even if stale!)
     if (distKm <= lastPayload.maxDistanceKm) {
+      if (!trail) {
+        trail = { points: [], maxAge: Infinity, active: true };
+        flightTrails.set(plane.hex, trail);
+      }
       trail.active = true;
-      trail.maxAge = 30000; // Reset/maintain full age range
+      trail.maxAge = Infinity; // Infinite age (no pruning) while active in the circle!
 
-      if (appendTrailPoints) {
+      // Only append new points if the plane is not stale and we are throttled
+      if (!isStale && appendTrailPoints) {
         trail.points.push({ x: x_unclamped, y: y_unclamped, t: now });
       }
     }
 
-    // Render secondary targets (if it is not the main selected flight and within range)
-    if ((!selected || plane.hex !== selected.hex) && distKm <= lastPayload.maxDistanceKm) {
+    // Render secondary targets (if it is not the main selected flight, not stale, and within range)
+    if (!isStale && (!selected || plane.hex !== selected.hex) && distKm <= lastPayload.maxDistanceKm) {
       secondaryHtml += `
         <g>
           <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" class="secondary-target-dot" />
@@ -393,6 +406,11 @@ function renderLoop() {
   for (const [hex, trail] of flightTrails.entries()) {
     // If trail is inactive (plane departed or vanished), decay its maxAge
     if (!trail.active) {
+      if (trail.maxAge === Infinity) {
+        // Just transitioned to inactive: initialize maxAge to actual span of the points (min 30s)
+        const oldestAge = (trail.points && trail.points.length > 0) ? (now - trail.points[0].t) : 30000;
+        trail.maxAge = Math.max(30000, oldestAge);
+      }
       // Shrink maxAge by 150ms per frame (completely vanishes in ~3.3 seconds)
       trail.maxAge = Math.max(0, trail.maxAge - 150);
       if (trail.maxAge <= 0 || trail.points.length === 0) {
@@ -402,7 +420,9 @@ function renderLoop() {
     }
 
     // Filter points based on current maxAge
-    trail.points = trail.points.filter(p => now - p.t < trail.maxAge);
+    if (trail.maxAge !== Infinity) {
+      trail.points = trail.points.filter(p => now - p.t < trail.maxAge);
+    }
 
     if (trail.points.length > 1) {
       for (let i = 0; i < trail.points.length - 1; i++) {
@@ -411,7 +431,14 @@ function renderLoop() {
         
         // Calculate age factor based on average age of segment endpoints
         const ageMs = now - (pStart.t + pEnd.t) / 2;
-        const ageFactor = Math.max(0, 1 - ageMs / trail.maxAge);
+        let ageFactor;
+        if (trail.maxAge === Infinity) {
+          // While active inside range: no decay or shortening at all (constant opacity)
+          ageFactor = 0.85;
+        } else {
+          // While decaying after departure: collapse trail in temporal order
+          ageFactor = Math.max(0, 1 - ageMs / trail.maxAge);
+        }
         
         // Render segment with age factor opacity (head is bolder, tail is faded)
         if (ageFactor > 0.01) {
@@ -464,7 +491,7 @@ function renderLoop() {
     noFlightCardEl.classList.add("hidden");
     targetGroupEl.classList.remove("hidden");
     radarArrowOrbitEl.classList.remove("hidden");
-    scanningOverlayEl.classList.add("hidden");
+    scanningOverlayEl.classList.remove("hidden");
 
     // Position target reticle
     targetGroupEl.setAttribute("transform", `translate(${displayedX.toFixed(1)}, ${displayedY.toFixed(1)})`);
