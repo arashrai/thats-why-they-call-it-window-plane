@@ -322,11 +322,11 @@ function renderLoop() {
     const state = planeStates.get(plane.hex);
     if (!state) return;
 
-    // Calculate age relative to the last true package update
-    const ageSec = Math.min(10, (now - state.lastTrueTime) / 1000);
+    // Calculate age of the last true ADS-B measurement projected to the present moment
+    const planeAge = (plane.seenSec ?? 0) + elapsedSec;
     
     // Estimate raw projected position (using turn rate)
-    const estPos = estimatePosition(plane, ageSec, state.turnRateDegPerSec);
+    const estPos = estimatePosition(plane, planeAge, state.turnRateDegPerSec);
     if (!estPos) return;
 
     // Smoothly blend current state towards the projected target
@@ -360,17 +360,18 @@ function renderLoop() {
     // Handle Trail appending (use UNCLAMPED coordinates)
     let trail = flightTrails.get(plane.hex);
     if (!trail) {
-      trail = { points: [], opacity: 1.0, active: true };
+      trail = { points: [], maxAge: 30000, active: true };
       flightTrails.set(plane.hex, trail);
     }
     
-    trail.active = true;
-    trail.opacity = 1.0;
+    // Only keep trail active if the plane is within our max distance circle
+    if (distKm <= lastPayload.maxDistanceKm) {
+      trail.active = true;
+      trail.maxAge = 30000; // Reset/maintain full age range
 
-    if (appendTrailPoints) {
-      trail.points.push({ x: x_unclamped, y: y_unclamped, t: now });
-      // Keep trailing path length to last 30 seconds
-      trail.points = trail.points.filter(p => now - p.t < 30000);
+      if (appendTrailPoints) {
+        trail.points.push({ x: x_unclamped, y: y_unclamped, t: now });
+      }
     }
 
     // Render secondary targets (if it is not the main selected flight and within range)
@@ -390,14 +391,18 @@ function renderLoop() {
   // 3. Decay and Render Trails (fade older segments first)
   let trailsHtml = "";
   for (const [hex, trail] of flightTrails.entries()) {
-    // If plane has vanished from the active receiver feed, decay its opacity
+    // If trail is inactive (plane departed or vanished), decay its maxAge
     if (!trail.active) {
-      trail.opacity -= 0.004; // completely fades out in ~4 seconds at 60fps
-      if (trail.opacity <= 0) {
+      // Shrink maxAge by 150ms per frame (completely vanishes in ~3.3 seconds)
+      trail.maxAge = Math.max(0, trail.maxAge - 150);
+      if (trail.maxAge <= 0 || trail.points.length === 0) {
         flightTrails.delete(hex);
         continue;
       }
     }
+
+    // Filter points based on current maxAge
+    trail.points = trail.points.filter(p => now - p.t < trail.maxAge);
 
     if (trail.points.length > 1) {
       for (let i = 0; i < trail.points.length - 1; i++) {
@@ -406,11 +411,11 @@ function renderLoop() {
         
         // Calculate age factor based on average age of segment endpoints
         const ageMs = now - (pStart.t + pEnd.t) / 2;
-        const ageFactor = Math.max(0, 1 - ageMs / 30000);
-        const segmentOpacity = ageFactor * trail.opacity;
+        const ageFactor = Math.max(0, 1 - ageMs / trail.maxAge);
         
-        if (segmentOpacity > 0.01) {
-          trailsHtml += `<line x1="${pStart.x.toFixed(1)}" y1="${pStart.y.toFixed(1)}" x2="${pEnd.x.toFixed(1)}" y2="${pEnd.y.toFixed(1)}" class="radar-trail-line" stroke-opacity="${segmentOpacity.toFixed(2)}" />`;
+        // Render segment with age factor opacity (head is bolder, tail is faded)
+        if (ageFactor > 0.01) {
+          trailsHtml += `<line x1="${pStart.x.toFixed(1)}" y1="${pStart.y.toFixed(1)}" x2="${pEnd.x.toFixed(1)}" y2="${pEnd.y.toFixed(1)}" class="radar-trail-line" stroke-opacity="${ageFactor.toFixed(2)}" />`;
         }
       }
     }
