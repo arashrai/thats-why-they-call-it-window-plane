@@ -204,6 +204,11 @@ function cleanExpiredCacheEntries() {
         delete routeCache[key];
         modified = true;
       }
+    } else if (value.failed) {
+      if (age > 60 * 60 * 1000) { // 1 hour for temp errors
+        delete routeCache[key];
+        modified = true;
+      }
     } else {
       if (age > CACHE_EXPIRY_MS) {
         delete routeCache[key];
@@ -247,8 +252,25 @@ function triggerRouteLookup(callsign) {
   const cleanCallsign = callsign.trim().toUpperCase().replace(/\s+/g, "");
   if (!cleanCallsign) return;
 
-  if (routeCache[cleanCallsign] || fetchInProgress.has(cleanCallsign)) {
+  const cached = routeCache[cleanCallsign];
+  if (fetchInProgress.has(cleanCallsign)) {
     return;
+  }
+
+  const now = Date.now();
+  if (cached) {
+    if (cached.notFound) {
+      return; // Do not query known not found items (24h expiry handles invalidation)
+    }
+    if (cached.failed) {
+      const retryDelayMs = 60 * 60 * 1000; // 1 hour
+      if (now - cached.timestamp < retryDelayMs) {
+        return; // Do not retry transient errors within 1 hour
+      }
+      console.log(`[API] Retrying route lookup for callsign ${cleanCallsign} after 1 hour...`);
+    } else {
+      return; // Already cached successfully
+    }
   }
 
   fetchInProgress.add(cleanCallsign);
@@ -256,12 +278,24 @@ function triggerRouteLookup(callsign) {
 
   fetch(`https://api.adsbdb.com/v0/callsign/${cleanCallsign}`)
     .then((res) => {
+      if (res.status === 404) {
+        routeCache[cleanCallsign] = {
+          notFound: true,
+          timestamp: now
+        };
+        saveRouteCache();
+        console.log(`[API] Route for ${cleanCallsign} not found (404). Caching negative result for 24h.`);
+        return null;
+      }
+
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
       }
       return res.json();
     })
     .then((data) => {
+      if (!data) return; // 404 handled above
+
       const routeInfo = data?.response?.flightroute || null;
       if (routeInfo) {
         routeCache[cleanCallsign] = {
@@ -276,20 +310,26 @@ function triggerRouteLookup(callsign) {
             name: routeInfo.destination.municipality || routeInfo.destination.name || null,
             airport: routeInfo.destination.name || null
           } : null,
-          timestamp: Date.now()
+          timestamp: now
         };
         console.log(`[API] Successfully cached route for ${cleanCallsign}: ${routeCache[cleanCallsign].origin?.code} -> ${routeCache[cleanCallsign].destination?.code}`);
       } else {
         routeCache[cleanCallsign] = {
           notFound: true,
-          timestamp: Date.now()
+          timestamp: now
         };
-        console.log(`[API] Route for ${cleanCallsign} not found in ADSBDB.`);
+        console.log(`[API] Response for ${cleanCallsign} lacked route info. Caching negative result for 24h.`);
       }
       saveRouteCache();
     })
     .catch((err) => {
       console.error(`[API] Error fetching route for ${cleanCallsign}:`, err.message);
+      // Cache as temporary failure to prevent retries for 1 hour
+      routeCache[cleanCallsign] = {
+        failed: true,
+        timestamp: Date.now()
+      };
+      saveRouteCache();
     })
     .finally(() => {
       fetchInProgress.delete(cleanCallsign);
@@ -359,7 +399,7 @@ function enrichAircraft(a) {
   const cleanCallsign = a.flight?.trim().toUpperCase().replace(/\s+/g, "") || null;
   const route = cleanCallsign ? routeCache[cleanCallsign] : null;
 
-  if (cleanCallsign && !route) {
+  if (cleanCallsign) {
     triggerRouteLookup(cleanCallsign);
   }
 
@@ -381,7 +421,7 @@ function enrichAircraft(a) {
     bearingFromHomeDeg,
     elevationAngleDeg: elev,
     uiAngleDeg: bearingToUiAngleDeg(bearingFromHomeDeg),
-    route: (route && !route.notFound) ? {
+    route: (route && !route.notFound && !route.failed) ? {
       airline: route.airline,
       origin: route.origin,
       destination: route.destination
