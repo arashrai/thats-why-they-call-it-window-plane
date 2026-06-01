@@ -129,6 +129,7 @@ async function run() {
     };
 
     try {
+      await fs.mkdir(targetDir, { recursive: true });
       await fs.writeFile(targetFile, JSON.stringify(payload, null, 2), "utf8");
     } catch (err) {
       console.error("Error writing mock aircraft.json:", err);
