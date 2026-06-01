@@ -438,6 +438,9 @@ function renderLoop() {
 
     // Check if we need to record a verified point
     if (state.hasNewVerifiedCoord) {
+      // 1. Clear any predicted (blue) points that were added after the new verified coordinate's timestamp
+      trail.points = trail.points.filter(p => p.isVerified || p.t <= state.lastTrueTime);
+
       const rawDistNm = haversineNm(config.homeLat, config.homeLon, state.lastTrueLat, state.lastTrueLon);
       const rawDistKm = rawDistNm * 1.852;
       const rawBearing = bearingDeg(config.homeLat, config.homeLon, state.lastTrueLat, state.lastTrueLon);
@@ -446,13 +449,42 @@ function renderLoop() {
       const rawX = rawR * Math.cos(degToRad(rawUiAngle));
       const rawY = rawR * Math.sin(degToRad(rawUiAngle));
 
+      // 2. Add the verified orange dot
       trail.points.push({
         x: rawX,
         y: rawY,
         t: state.lastTrueTime,
         isVerified: true
       });
+
+      // 3. Backfill predicted blue dots for the lag duration (from state.lastTrueTime + 300ms up to now)
+      let backfillT = Math.max(now - 30000, state.lastTrueTime + 300); // cap backfill at 30 seconds
+      while (backfillT <= now) {
+        const est = estimatePositionFromState(state, backfillT, state.groundSpeedKmh, state.verticalRateFpm);
+        if (est) {
+          const estDistNm = haversineNm(config.homeLat, config.homeLon, est.lat, est.lon);
+          const estDistKm = estDistNm * 1.852;
+          const estBearing = bearingDeg(config.homeLat, config.homeLon, est.lat, est.lon);
+          const estUiAngle = bearingToUiAngleDeg(estBearing, config.downBearingDeg, config.bearingToUiScale);
+          const estR = (estDistKm / lastPayload.maxDistanceKm) * 140;
+          const estX = estR * Math.cos(degToRad(estUiAngle));
+          const estY = estR * Math.sin(degToRad(estUiAngle));
+
+          trail.points.push({
+            x: estX,
+            y: estY,
+            t: backfillT,
+            isVerified: false
+          });
+        }
+        backfillT += 300;
+      }
+
+      // Sort the trail points to ensure perfect chronological rendering order
+      trail.points.sort((a, b) => a.t - b.t);
+
       state.hasNewVerifiedCoord = false;
+      state.lastPredPointTime = now;
     }
 
     // Append periodic prediction points every 300ms
