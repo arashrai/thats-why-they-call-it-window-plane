@@ -303,7 +303,7 @@ function isSelectableAircraft(a) {
     a.lon != null &&
     a.distanceKm != null &&
     a.elevationAngleDeg != null &&
-    (a.seenSec ?? 999) < 10 &&
+    (a.seenPosSec ?? 999) < 10 &&
     a.distanceKm <= HOME.maxDistanceKm &&
     a.elevationAngleDeg >= HOME.minElevationAngleDeg &&
     a.elevationAngleDeg <= HOME.maxElevationAngleDeg
