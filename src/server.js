@@ -297,6 +297,19 @@ function bearingToUiAngleDeg(bearingFromHomeDeg) {
   return normalizeDeg(90 - diffFromDown * HOME.bearingToUiScale);
 }
 
+function isValidMovingAircraft(a) {
+  if (!a.hex) return false;
+  if (typeof a.lat !== "number" || typeof a.lon !== "number") return false;
+
+  const alt = a.alt_baro ?? a.alt_geom;
+  if (alt == null || typeof alt !== "number") return false;
+
+  if (a.track == null || typeof a.track !== "number") return false;
+  if (a.gs == null || typeof a.gs !== "number" || a.gs < 10) return false;
+
+  return true;
+}
+
 function isSelectableAircraft(a) {
   return (
     a.lat != null &&
@@ -382,7 +395,7 @@ app.get("/api/aircraft", async (_req, res) => {
     const data = JSON.parse(raw);
 
     const aircraft = (data.aircraft || [])
-      .filter((a) => a.flight || a.lat || a.lon || a.alt_baro || a.alt_geom)
+      .filter(isValidMovingAircraft)
       .map(enrichAircraft)
       .sort((a, b) => {
         if (a.isSelectable && !b.isSelectable) return -1;

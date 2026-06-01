@@ -215,15 +215,10 @@ async function fetchAirspace() {
     localTimeAtFetch = Date.now();
     config = data.config;
     
-    if (data.selected) {
-      const currentActive = currentSelectedHex ? planeStates.get(currentSelectedHex) : null;
-      if (!currentActive) {
-        currentSelectedHex = data.selected.hex;
-      }
-    }
-    
     // Update plane states (turn rate & smooth position trackers)
     updatePlaneStates(data.aircraft || []);
+    
+    currentSelectedHex = data.selected ? data.selected.hex : null;
     
     // Hide error overlay
     errorOverlayEl.classList.add("hidden");
@@ -401,19 +396,21 @@ function renderLoop() {
     }
   }
 
-  // Process and project positions of all planes
   for (const [hex, state] of planeStates.entries()) {
-    // Prune stale static planes (no update for 300s / 5 mins)
     const ageSinceLastTrue = now - state.lastTrueTime;
-    const isStationary = !state.groundSpeedKmh || state.groundSpeedKmh < 5;
-    if (isStationary && ageSinceLastTrue > 300000) {
-      planeStates.delete(hex);
-      const trail = flightTrails.get(hex);
-      if (trail) trail.active = false;
-      continue;
-    }
 
-    const estPos = estimatePositionFromState(state, now, state.groundSpeedKmh, state.verticalRateFpm);
+    let estPos = state.lastCachedEstPos;
+    const isSelected = currentSelectedHex && hex === currentSelectedHex;
+    const isStaleForCalc = ageSinceLastTrue >= 10000 && !isSelected;
+    const shouldRecalc = !estPos || 
+                         !isStaleForCalc || 
+                         (!state.lastEstPosCalcTime || now - state.lastEstPosCalcTime > 1000);
+
+    if (shouldRecalc) {
+      estPos = estimatePositionFromState(state, now, state.groundSpeedKmh, state.verticalRateFpm);
+      state.lastCachedEstPos = estPos;
+      state.lastEstPosCalcTime = now;
+    }
     if (!estPos) continue;
 
     const distNm = haversineNm(config.homeLat, config.homeLon, estPos.lat, estPos.lon);
@@ -518,8 +515,11 @@ function renderLoop() {
       }
     }
 
+    const TRAIL_MAX_AGE_MS = 60000;
     if (trail.maxAge !== Infinity) {
       trail.points = trail.points.filter(p => now - p.t < trail.maxAge);
+    } else {
+      trail.points = trail.points.filter(p => now - p.t < TRAIL_MAX_AGE_MS);
     }
 
     if (trail.points.length > 0) {
@@ -527,7 +527,7 @@ function renderLoop() {
         const ageMs = now - p.t;
         let ageFactor;
         if (trail.maxAge === Infinity) {
-          ageFactor = 0.85;
+          ageFactor = Math.max(0, 1 - ageMs / TRAIL_MAX_AGE_MS) * 0.85;
         } else {
           ageFactor = Math.max(0, 1 - ageMs / trail.maxAge);
         }
