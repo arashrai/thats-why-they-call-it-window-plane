@@ -7,7 +7,7 @@
     <title>Window Plane HUD</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Orbitron:wght@600;700;900&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
@@ -16,9 +16,6 @@
       <div class="radar-panel">
         <div class="radar-aspect-box">
           <div id="radar" class="radar">
-            <!-- Sweep effect element -->
-            <div class="radar-sweep"></div>
-            
             <!-- Radar SVG Grid -->
             <svg id="radar-grid" class="radar-grid" viewBox="-150 -150 300 300">
               <!-- Radial rings -->
@@ -51,17 +48,20 @@
                 <text x="-150" y="3" class="compass-label west">W</text>
               </g>
 
-              <!-- Historic trail path -->
-              <path id="plane-trail" class="plane-trail" d="" />
+              <!-- Dynamic decaying trails group -->
+              <g id="radar-trails" class="radar-trails"></g>
+
+              <!-- Secondary target dots and labels -->
+              <g id="secondary-targets" class="secondary-targets"></g>
 
               <!-- Target indicators (glowing locked target) -->
               <g id="target-group" class="target-group hidden">
-                <circle id="target-point" r="4" class="target-point" />
-                <circle id="target-ring" r="8" class="target-ring" />
-                <line id="target-line-x1" x1="-12" y1="0" x2="-6" y2="0" class="target-cross" />
-                <line id="target-line-x2" x1="6" y1="0" x2="12" y2="0" class="target-cross" />
-                <line id="target-line-y1" x1="0" y1="-12" x2="0" y2="-6" class="target-cross" />
-                <line id="target-line-y2" x1="0" y1="6" x2="0" y2="12" class="target-cross" />
+                <circle id="target-point" r="5" class="target-point" />
+                <circle id="target-ring" r="9" class="target-ring" />
+                <line id="target-line-x1" x1="-14" y1="0" x2="-7" y2="0" class="target-cross" />
+                <line id="target-line-x2" x1="7" y1="0" x2="14" y2="0" class="target-cross" />
+                <line id="target-line-y1" x1="0" y1="-14" x2="0" y2="-7" class="target-cross" />
+                <line id="target-line-y2" x1="0" y1="7" x2="0" y2="14" class="target-cross" />
               </g>
             </svg>
 
@@ -69,7 +69,7 @@
             <div id="radar-arrow-orbit" class="radar-arrow-orbit hidden">
               <div class="radar-arrow">
                 <svg viewBox="0 0 40 40" class="arrow-svg">
-                  <path d="M20,5 L35,28 L20,20 L5,28 Z" class="arrow-shape" />
+                  <path d="M20,3 L37,28 L20,19 L3,28 Z" class="arrow-shape" />
                 </svg>
                 <div id="arrow-bearing-label" class="arrow-bearing-label">000°</div>
               </div>
@@ -86,20 +86,12 @@
 
       <!-- Info Panel (Right side layout) -->
       <div class="info-panel">
-        <header class="panel-header">
-          <div class="logo-area">
-            <span class="logo-icon">✈</span>
-            <span class="logo-text font-hud">WINDOW PLANE</span>
-          </div>
-          <div id="system-status" class="system-status font-hud">FEED ONLINE</div>
-        </header>
-
         <!-- Main plane stats card -->
         <main class="stats-card">
           <!-- Shown when a plane is active -->
           <div id="flight-data" class="flight-data hidden">
             <div class="flight-identity">
-              <div id="airline-name" class="airline-name font-hud font-muted">ALASKA AIRLINES</div>
+              <div id="airline-name" class="airline-name font-hud">ALASKA AIRLINES</div>
               <h1 id="flight-callsign" class="flight-callsign font-hud">ASA611</h1>
               <div id="aircraft-type" class="aircraft-type">Boeing 737 MAX 9</div>
             </div>
@@ -135,12 +127,12 @@
               </div>
 
               <div class="metric-box highlighted">
-                <div class="metric-label font-hud">DISTANCE</div>
+                <div class="metric-label font-hud">PROXIMITY</div>
                 <div class="metric-value-row">
                   <span id="metric-distance" class="metric-value font-hud">4.8</span>
                   <span class="metric-unit">KM</span>
                 </div>
-                <div id="metric-elevation" class="metric-subtext">32° ELEVATION</div>
+                <div id="metric-elevation" class="metric-subtext">HIGH IN SKY (32° up)</div>
               </div>
 
               <div class="metric-box">
@@ -149,7 +141,7 @@
                   <span id="metric-speed" class="metric-value font-hud">408</span>
                   <span class="metric-unit">KM/H</span>
                 </div>
-                <div id="metric-speed-kt" class="metric-subtext">220 KNOTS</div>
+                <div class="metric-subtext">GROUND SPEED</div>
               </div>
 
               <div class="metric-box">

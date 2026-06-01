@@ -1,25 +1,20 @@
 /* Custom properties for the HUD theme */
 :root {
   --bg-color: #000000;
-  --panel-bg: rgba(10, 15, 25, 0.7);
-  --border-color: rgba(0, 240, 255, 0.15);
+  --panel-bg: rgba(12, 18, 28, 0.75);
+  --border-color: rgba(0, 240, 255, 0.22);
   
   /* Primary Accent: Glowing Cyan */
   --accent-cyan: hsl(184, 100%, 50%);
   --accent-cyan-rgb: 0, 240, 255;
-  --accent-cyan-dim: rgba(0, 240, 255, 0.2);
   
   /* Highlight Accent: Glowing Amber */
   --accent-amber: #ffb703;
   --accent-amber-rgb: 255, 183, 3;
-  --accent-amber-dim: rgba(255, 183, 3, 0.25);
   
   /* Typography */
   --font-hud: 'Orbitron', monospace;
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  
-  /* Grid sizes */
-  --radar-radius: 46%;
 }
 
 /* Global Reset & Base Styling */
@@ -46,7 +41,7 @@ html, body {
 }
 
 .font-muted {
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .hidden {
@@ -58,7 +53,7 @@ html, body {
 /* Two-column dashboard layout */
 .app-container {
   display: grid;
-  grid-template-columns: 1.25fr 1fr;
+  grid-template-columns: 1.15fr 1fr;
   height: 100vh;
   width: 100vw;
   background-color: var(--bg-color);
@@ -69,14 +64,14 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2vw;
+  padding: 3vw;
   position: relative;
   border-right: 1px solid var(--border-color);
-  background: radial-gradient(circle at center, rgba(0, 240, 255, 0.03) 0%, transparent 70%);
+  background: radial-gradient(circle at center, rgba(0, 240, 255, 0.04) 0%, transparent 75%);
 }
 
 .radar-aspect-box {
-  width: min(85%, 85vh);
+  width: min(90%, 90vh);
   aspect-ratio: 1 / 1;
   position: relative;
 }
@@ -85,32 +80,10 @@ html, body {
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  border: 1px solid var(--border-color);
-  background-color: rgba(5, 8, 12, 0.9);
+  border: 1.5px solid var(--border-color);
+  background-color: rgba(4, 6, 10, 0.95);
   position: relative;
-  box-shadow: 0 0 40px rgba(0, 240, 255, 0.05) inset;
-}
-
-/* Conic Sweep Animation */
-.radar-sweep {
-  position: absolute;
-  inset: 1px;
-  border-radius: 50%;
-  background: conic-gradient(
-    from 0deg,
-    rgba(0, 240, 255, 0.15) 0deg,
-    rgba(0, 240, 255, 0.03) 60deg,
-    transparent 180deg
-  );
-  pointer-events: none;
-  animation: radar-sweep-rotate 6s linear infinite;
-  transform-origin: center;
-  z-index: 1;
-}
-
-@keyframes radar-sweep-rotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  box-shadow: 0 0 50px rgba(0, 240, 255, 0.06) inset;
 }
 
 /* SVG grid lines */
@@ -126,23 +99,23 @@ html, body {
 
 .grid-ring {
   fill: none;
-  stroke: rgba(0, 240, 255, 0.08);
-  stroke-width: 1;
+  stroke: rgba(0, 240, 255, 0.12);
+  stroke-width: 1.25;
 }
 
 .ring-outer {
-  stroke: rgba(0, 240, 255, 0.15);
-  stroke-dasharray: 4 4;
+  stroke: rgba(0, 240, 255, 0.25);
+  stroke-dasharray: 5 5;
 }
 
 .grid-axis {
-  stroke: rgba(0, 240, 255, 0.08);
-  stroke-width: 0.75;
+  stroke: rgba(0, 240, 255, 0.12);
+  stroke-width: 1;
 }
 
 .grid-tick {
-  stroke: rgba(0, 240, 255, 0.2);
-  stroke-width: 1;
+  stroke: rgba(0, 240, 255, 0.3);
+  stroke-width: 1.25;
 }
 
 /* Rotatable Compass */
@@ -154,31 +127,49 @@ html, body {
 
 .compass-label {
   font-family: var(--font-hud);
-  font-size: 8px;
-  font-weight: 700;
-  fill: rgba(0, 240, 255, 0.4);
+  font-size: 9px;
+  font-weight: 800;
+  fill: rgba(0, 240, 255, 0.55);
   text-anchor: middle;
   dominant-baseline: middle;
-  letter-spacing: 0;
 }
 
 .compass-label.north {
   fill: var(--accent-cyan);
-  filter: drop-shadow(0 0 2px rgba(0, 240, 255, 0.5));
+  filter: drop-shadow(0 0 3px rgba(0, 240, 255, 0.6));
   font-weight: 900;
-  font-size: 10px;
+  font-size: 11px;
 }
 
-/* Plane Trail and Target */
-.plane-trail {
+/* Plane Trails */
+.radar-trail-line {
   fill: none;
-  stroke: rgba(0, 240, 255, 0.45);
-  stroke-width: 1.5;
+  stroke: var(--accent-cyan);
+  stroke-width: 2.5;
   stroke-linecap: round;
-  stroke-dasharray: 1 5; /* creates clean dot grid trail */
-  animation: trail-flow 1s linear infinite;
+  stroke-dasharray: 1 6; /* dot grid trail */
+  transition: opacity 0.1s linear;
 }
 
+/* Secondary Targets */
+.secondary-target-dot {
+  fill: var(--accent-cyan);
+  stroke: #ffffff;
+  stroke-width: 0.5;
+  opacity: 0.75;
+  filter: drop-shadow(0 0 3px var(--accent-cyan));
+}
+
+.secondary-target-label {
+  font-family: var(--font-hud);
+  font-size: 7px;
+  font-weight: 700;
+  fill: rgba(255, 255, 255, 0.85);
+  text-anchor: middle;
+  filter: drop-shadow(0 1px 2px #000);
+}
+
+/* Selected Locked Target - Static and High-Visibility */
 .target-group {
   transition: transform 0.05s linear;
   will-change: transform;
@@ -186,36 +177,31 @@ html, body {
 
 .target-point {
   fill: var(--accent-amber);
-  filter: drop-shadow(0 0 4px var(--accent-amber));
+  filter: drop-shadow(0 0 6px var(--accent-amber));
+  stroke: #ffffff;
+  stroke-width: 0.75;
 }
 
 .target-ring {
   fill: none;
   stroke: var(--accent-amber);
-  stroke-width: 1;
-  transform-origin: center;
-  animation: target-ring-pulse 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
-}
-
-@keyframes target-ring-pulse {
-  0% { transform: scale(0.6); opacity: 1; }
-  100% { transform: scale(1.6); opacity: 0; }
+  stroke-width: 1.5;
+  filter: drop-shadow(0 0 3px var(--accent-amber));
 }
 
 .target-cross {
   stroke: var(--accent-amber);
-  stroke-width: 0.75;
-  opacity: 0.8;
+  stroke-width: 1.25;
 }
 
-/* Perimeter Tracking Arrow */
+/* Prominent Perimeter Tracking Arrow */
 .radar-arrow-orbit {
   position: absolute;
   inset: 0;
   transform: rotate(var(--arrow-angle, 0deg));
   transform-origin: center;
   pointer-events: none;
-  transition: transform 0.1s linear; /* linear to track smooth loop updates */
+  transition: transform 0.1s linear;
   will-change: transform;
   z-index: 3;
 }
@@ -224,40 +210,40 @@ html, body {
   position: absolute;
   right: 0;
   top: 50%;
-  transform: translate(50%, -50%) rotate(90deg); /* align arrow outward */
+  transform: translate(50%, -50%) rotate(90deg);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
 }
 
 .arrow-svg {
-  width: min(24px, 4.5vw);
-  height: min(24px, 4.5vw);
+  width: min(32px, 6vw);
+  height: min(32px, 6vw);
   overflow: visible;
 }
 
 .arrow-shape {
   fill: var(--accent-cyan);
-  filter: drop-shadow(0 0 6px var(--accent-cyan));
+  filter: drop-shadow(0 0 8px var(--accent-cyan));
   stroke: #ffffff;
-  stroke-width: 1;
+  stroke-width: 1.5;
   stroke-linejoin: round;
 }
 
 .arrow-bearing-label {
   font-family: var(--font-hud);
-  font-size: min(10px, 1.8vw);
-  font-weight: 700;
+  font-size: min(12px, 2.2vw);
+  font-weight: 900;
   color: var(--accent-cyan);
-  background-color: var(--bg-color);
-  padding: 1px 4px;
-  border: 1px solid var(--border-color);
-  border-radius: 2px;
-  text-shadow: 0 0 4px rgba(0, 240, 255, 0.4);
-  /* Counter-rotate label to keep it upright */
+  background-color: #000000;
+  padding: 2px 6px;
+  border: 1.5px solid var(--accent-cyan);
+  border-radius: 4px;
+  text-shadow: 0 0 4px rgba(0, 240, 255, 0.6);
   transform: rotate(calc(-1 * var(--arrow-angle, 0deg) - 90deg));
   will-change: transform;
+  filter: drop-shadow(0 2px 5px rgba(0,0,0,0.8));
 }
 
 /* Scanning visualization when idle */
@@ -277,7 +263,7 @@ html, body {
   position: absolute;
   width: 100%;
   height: 100%;
-  border: 1px solid rgba(0, 240, 255, 0.15);
+  border: 1.5px solid rgba(0, 240, 255, 0.2);
   border-radius: 50%;
   transform: scale(0.1);
   animation: scan-ripple 4s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
@@ -285,70 +271,32 @@ html, body {
 
 @keyframes scan-ripple {
   0% { transform: scale(0.1); opacity: 0.8; }
-  50% { opacity: 0.3; }
+  50% { opacity: 0.4; }
   100% { transform: scale(0.96); opacity: 0; }
 }
 
 .scanning-text {
-  font-size: clamp(14px, 2vw, 20px);
+  font-size: clamp(16px, 2.5vw, 24px);
   color: var(--accent-cyan);
-  opacity: 0.8;
+  font-weight: 700;
   animation: pulse-opacity 2s ease-in-out infinite;
-  text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.6);
 }
 
 @keyframes pulse-opacity {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.9; }
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
 }
 
-/* Right Panel: Information Dashboard */
+/* Right Panel: Information Dashboard - Clean & Packed */
 .info-panel {
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: 1fr auto;
   height: 100vh;
-  padding: 3.5vh 3.5vw;
+  padding: 4.5vh 4vw;
   background-color: var(--bg-color);
   border-left: 1px solid var(--border-color);
   overflow: hidden;
-}
-
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-bottom: 2.5vh;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.logo-area {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.logo-icon {
-  font-size: 22px;
-  color: var(--accent-cyan);
-  filter: drop-shadow(0 0 4px var(--accent-cyan));
-}
-
-.logo-text {
-  font-size: 16px;
-  font-weight: 800;
-  background: linear-gradient(90deg, #ffffff 0%, var(--accent-cyan) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.system-status {
-  font-size: 11px;
-  color: var(--accent-cyan);
-  border: 1px solid rgba(0, 240, 255, 0.3);
-  padding: 2px 8px;
-  border-radius: 4px;
-  background-color: rgba(0, 240, 255, 0.05);
-  box-shadow: 0 0 8px rgba(0, 240, 255, 0.1);
 }
 
 /* Stats Card Panel */
@@ -356,41 +304,41 @@ html, body {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 3vh 0;
   min-height: 0;
 }
 
 .flight-data {
   display: flex;
   flex-direction: column;
-  gap: 3.5vh;
+  gap: 4.5vh;
 }
 
 .flight-identity {
   display: flex;
   flex-direction: column;
-  gap: 0.5vh;
+  gap: 0.7vh;
 }
 
 .airline-name {
-  font-size: clamp(12px, 1.5vw, 15px);
-  font-weight: 600;
+  font-size: clamp(14px, 1.8vw, 20px);
+  font-weight: 700;
   text-transform: uppercase;
   color: var(--accent-cyan);
+  text-shadow: 0 0 4px rgba(0, 240, 255, 0.3);
 }
 
 .flight-callsign {
-  font-size: clamp(48px, 6vw, 76px);
-  line-height: 1;
+  font-size: clamp(60px, 8.5vw, 100px);
+  line-height: 0.95;
   font-weight: 900;
   color: #ffffff;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
 }
 
 .aircraft-type {
-  font-size: clamp(14px, 1.8vw, 18px);
-  color: rgba(255, 255, 255, 0.7);
-  font-weight: 300;
+  font-size: clamp(18px, 2.2vw, 26px);
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 400;
 }
 
 /* Route Display (SFO -> SEA) */
@@ -398,10 +346,10 @@ html, body {
   background-color: var(--panel-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 2vh 2vw;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  border: 1.5px solid var(--border-color);
+  border-radius: 10px;
+  padding: 2.2vh 2vw;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
 }
 
 .route-airports {
@@ -416,16 +364,17 @@ html, body {
 }
 
 .airport-code {
-  font-size: clamp(24px, 3.2vw, 36px);
+  font-size: clamp(30px, 4vw, 52px);
   font-weight: 900;
-  line-height: 1.1;
+  line-height: 1;
   color: #ffffff;
 }
 
 .airport-name {
-  font-size: clamp(11px, 1.3vw, 13px);
-  color: rgba(255, 255, 255, 0.5);
-  margin-top: 2px;
+  font-size: clamp(13px, 1.6vw, 18px);
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+  margin-top: 3px;
 }
 
 .route-connector {
@@ -434,21 +383,22 @@ html, body {
   align-items: center;
   justify-content: center;
   position: relative;
-  padding: 0 15px;
+  padding: 0 20px;
 }
 
 .connector-line {
-  height: 1px;
+  height: 1.5px;
   background: linear-gradient(90deg, var(--border-color) 0%, var(--accent-cyan) 50%, var(--border-color) 100%);
   width: 100%;
 }
 
 .connector-icon {
   position: absolute;
-  font-size: 14px;
+  font-size: 18px;
   color: var(--accent-cyan);
   transform: rotate(90deg);
-  animation: plane-fly-slow 10s linear infinite;
+  animation: plane-fly-slow 8s linear infinite;
+  text-shadow: 0 0 8px var(--accent-cyan);
 }
 
 @keyframes plane-fly-slow {
@@ -461,30 +411,30 @@ html, body {
 .metrics-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2vh 2vw;
+  gap: 2.2vh 2vw;
 }
 
 .metric-box {
   background-color: var(--panel-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 2.2vh 2vw;
+  border: 1.5px solid var(--border-color);
+  border-radius: 10px;
+  padding: 2.5vh 2.2vw;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .metric-box.highlighted {
-  border-color: rgba(255, 183, 3, 0.4);
-  box-shadow: 0 0 15px rgba(255, 183, 3, 0.05);
+  border-color: var(--accent-amber);
+  box-shadow: 0 0 20px rgba(255, 183, 3, 0.1);
 }
 
 .metric-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .metric-value-row {
@@ -494,39 +444,42 @@ html, body {
 }
 
 .metric-value {
-  font-size: clamp(24px, 3.2vw, 36px);
-  font-weight: 800;
+  font-size: clamp(28px, 3.8vw, 48px);
+  font-weight: 900;
   line-height: 1;
 }
 
 .metric-box.highlighted .metric-value {
   color: var(--accent-amber);
-  text-shadow: 0 0 8px rgba(255, 183, 3, 0.3);
+  text-shadow: 0 0 10px rgba(255, 183, 3, 0.4);
 }
 
 .metric-unit {
-  font-size: 11px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .metric-subtext {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
-  font-weight: 400;
-  margin-top: 2px;
+  font-size: 14px;
+  color: #ffffff;
+  font-weight: 600;
+  margin-top: 4px;
+  text-transform: uppercase;
 }
 
 .trend-icon {
-  font-size: 14px;
+  font-size: 18px;
   color: #10b981;
   margin-left: auto;
+  text-shadow: 0 0 6px #10b981;
 }
 
 /* Signal update timer */
 .signal-age {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.3);
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.45);
   text-align: right;
   margin-top: -1vh;
   letter-spacing: 0.05em;
@@ -539,31 +492,29 @@ html, body {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 6vh 2vw;
-  border: 1px dashed var(--border-color);
-  border-radius: 8px;
-  background-color: rgba(5, 8, 12, 0.4);
-  position: relative;
-  overflow: hidden;
+  padding: 8vh 2vw;
+  border: 2px dashed var(--border-color);
+  border-radius: 10px;
+  background-color: rgba(4, 6, 10, 0.6);
 }
 
 .no-flight-card h2 {
-  font-size: 18px;
-  color: rgba(255, 255, 255, 0.7);
-  margin-bottom: 10px;
+  font-size: 22px;
+  color: #ffffff;
+  margin-bottom: 12px;
 }
 
 .no-flight-card p {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.45);
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .sonar-wave {
-  width: 100px;
-  height: 100px;
-  border: 1px solid var(--border-color);
+  width: 120px;
+  height: 120px;
+  border: 1.5px solid var(--border-color);
   border-radius: 50%;
-  margin-bottom: 25px;
+  margin-bottom: 30px;
   position: relative;
   animation: pulse-sonar 2s infinite ease-out;
 }
@@ -577,16 +528,16 @@ html, body {
 .nearby-panel {
   display: flex;
   flex-direction: column;
-  gap: 1.5vh;
-  border-top: 1px solid var(--border-color);
-  padding-top: 2.5vh;
+  gap: 1.8vh;
+  border-top: 1.5px solid var(--border-color);
+  padding-top: 3vh;
   min-height: 0;
 }
 
 .panel-subtitle {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
-  font-weight: 700;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 800;
 }
 
 .nearby-list {
@@ -594,7 +545,7 @@ html, body {
   flex-direction: column;
   gap: 1vh;
   overflow-y: auto;
-  max-height: 22vh;
+  max-height: 25vh;
   padding-right: 5px;
 }
 
@@ -616,27 +567,27 @@ html, body {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  background-color: rgba(255, 255, 255, 0.02);
+  background-color: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 1.2vh 1.5vw;
-  font-size: 13px;
+  border-radius: 8px;
+  padding: 1.4vh 1.8vw;
+  font-size: 14px;
   transition: all 0.2s ease;
 }
 
 .nearby-row:hover {
-  background-color: rgba(0, 240, 255, 0.03);
-  border-color: rgba(0, 240, 255, 0.3);
+  background-color: rgba(0, 240, 255, 0.04);
+  border-color: rgba(0, 240, 255, 0.4);
 }
 
 .nearby-callsign {
-  font-weight: 700;
+  font-weight: 800;
   font-family: var(--font-hud);
 }
 
 .nearby-route {
   color: rgba(255, 255, 255, 0.8);
-  font-size: 11px;
+  font-size: 12px;
   text-align: center;
 }
 
@@ -644,25 +595,25 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .nearby-dist {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--accent-amber);
 }
 
 .nearby-alt {
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .nearby-empty {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.3);
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.4);
   text-align: center;
-  padding: 2vh 0;
-  border: 1px dashed rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
+  padding: 2.5vh 0;
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
 }
 
 /* System Disconnected overlay styling */
@@ -670,7 +621,7 @@ html, body {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background-color: rgba(0, 0, 0, 0.92);
+  background-color: rgba(0, 0, 0, 0.95);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -678,32 +629,32 @@ html, body {
 }
 
 .error-box {
-  background-color: rgba(20, 10, 10, 0.8);
-  border: 1px solid #ef4444;
-  border-radius: 8px;
+  background-color: rgba(25, 10, 10, 0.9);
+  border: 2px solid #ef4444;
+  border-radius: 10px;
   padding: 40px;
   text-align: center;
-  box-shadow: 0 0 30px rgba(239, 68, 68, 0.15);
+  box-shadow: 0 0 40px rgba(239, 68, 68, 0.25);
   max-width: 450px;
 }
 
 .error-box h2 {
   color: #ef4444;
-  font-size: 20px;
+  font-size: 22px;
   margin-bottom: 12px;
-  text-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
 }
 
 .error-box p {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 14px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 15px;
 }
 
 /* Responsive adjustment (Portrait screens) */
 @media (max-width: 900px) {
   .app-container {
     grid-template-columns: 1fr;
-    grid-template-rows: 1.1fr 1.2fr;
+    grid-template-rows: 1fr 1.2fr;
     height: auto;
     overflow-y: auto;
   }
@@ -711,17 +662,17 @@ html, body {
   .radar-panel {
     border-right: none;
     border-bottom: 1px solid var(--border-color);
-    padding: 4vw;
+    padding: 6vw;
   }
   
   .radar-aspect-box {
-    width: min(80vw, 80vh);
+    width: min(85vw, 85vh);
   }
   
   .info-panel {
     border-left: none;
     height: auto;
-    padding: 4vw;
+    padding: 6vw;
   }
   
   .nearby-list {
