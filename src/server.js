@@ -187,6 +187,7 @@ function getAircraftType(a) {
 }
 
 let routeDatabase = {};
+const loggedMissingCallsigns = new Set();
 
 const IATA_TO_ICAO = {
   AS: "ASA",
@@ -221,6 +222,18 @@ const IATA_TO_ICAO = {
   TN: "UTN", // Air Tahiti Nui
   EI: "EIN"  // Aer Lingus
 };
+
+const OPERATING_AIRLINES = [
+  { name: "SkyWest", iata: "OO", icao: "SKW" },
+  { name: "Horizon", iata: "QX", icao: "QXE" },
+  { name: "Republic", iata: "YX", icao: "RPA" },
+  { name: "Mesa", iata: "YV", icao: "ASH" },
+  { name: "GoJet", iata: "G7", icao: "GJS" },
+  { name: "Envoy", iata: "MQ", icao: "ENY" },
+  { name: "Piedmont", iata: "PT", icao: "PDT" },
+  { name: "PSA", iata: "OH", icao: "JIA" },
+  { name: "Jazz", iata: "QK", icao: "JZA" }
+];
 
 async function updateSeaSchedule() {
   console.log("[Schedule] Updating SEA Airport flight schedule...");
@@ -267,6 +280,7 @@ async function updateSeaSchedule() {
             const icao = IATA_TO_ICAO[iata];
 
             const routeInfo = {
+              sortTime: flight.sortTime,
               airline: flight.carrier.name || null,
               origin: isArrival ? {
                 code: flight.airport?.fs || null,
@@ -288,9 +302,31 @@ async function updateSeaSchedule() {
               }
             };
 
-            tempDatabase[`${iata}${flightNum}`] = routeInfo;
+            const iataKey = `${iata}${flightNum}`;
+            if (!tempDatabase[iataKey]) tempDatabase[iataKey] = [];
+            tempDatabase[iataKey].push(routeInfo);
+
             if (icao) {
-              tempDatabase[`${icao}${flightNum}`] = routeInfo;
+              const icaoKey = `${icao}${flightNum}`;
+              if (!tempDatabase[icaoKey]) tempDatabase[icaoKey] = [];
+              tempDatabase[icaoKey].push(routeInfo);
+            }
+
+            if (flight.operatedBy) {
+              const opLower = flight.operatedBy.toLowerCase();
+              for (const op of OPERATING_AIRLINES) {
+                if (opLower.includes(op.name.toLowerCase())) {
+                  const opIataKey = `${op.iata}${flightNum}`;
+                  const opIcaoKey = `${op.icao}${flightNum}`;
+                  
+                  if (!tempDatabase[opIataKey]) tempDatabase[opIataKey] = [];
+                  tempDatabase[opIataKey].push(routeInfo);
+                  
+                  if (!tempDatabase[opIcaoKey]) tempDatabase[opIcaoKey] = [];
+                  tempDatabase[opIcaoKey].push(routeInfo);
+                  break;
+                }
+              }
             }
           }
         } catch (err) {
@@ -381,7 +417,30 @@ function enrichAircraft(a) {
   const elev = elevationAngleDeg(distanceNm, altitudeFt, HOME.elevationFt);
 
   const cleanCallsign = a.flight?.trim().toUpperCase().replace(/\s+/g, "") || null;
-  const route = cleanCallsign ? routeDatabase[cleanCallsign] : null;
+  let route = null;
+  if (cleanCallsign) {
+    const entries = routeDatabase[cleanCallsign];
+    if (entries && entries.length > 0) {
+      const nowMs = Date.now();
+      let closestEntry = null;
+      let minDiff = Infinity;
+      for (const entry of entries) {
+        const entryTimeMs = entry.sortTime ? Date.parse(entry.sortTime) : 0;
+        if (!entryTimeMs) continue;
+        const diff = Math.abs(nowMs - entryTimeMs);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestEntry = entry;
+        }
+      }
+      route = closestEntry || entries[0];
+    } else {
+      if (!loggedMissingCallsigns.has(cleanCallsign)) {
+        loggedMissingCallsigns.add(cleanCallsign);
+        console.log(`[Lookup] Route NOT found in schedule DB for callsign: ${cleanCallsign}`);
+      }
+    }
+  }
 
   const enriched = {
     hex: a.hex,
@@ -402,7 +461,11 @@ function enrichAircraft(a) {
     bearingFromHomeDeg,
     elevationAngleDeg: elev,
     uiAngleDeg: bearingToUiAngleDeg(bearingFromHomeDeg),
-    route: route || null
+    route: route ? {
+      airline: route.airline,
+      origin: route.origin,
+      destination: route.destination
+    } : null
   };
 
   enriched.isSelectable = isSelectableAircraft(enriched);
