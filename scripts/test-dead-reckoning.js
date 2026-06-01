@@ -11,13 +11,16 @@ function signedAngularDiffDeg(angle, reference) {
 function estimatePositionFromState(state, now, groundSpeedKmh, verticalRateFpm) {
   if (state.lastTrueLat == null || state.lastTrueLon == null) return null;
   
-  const ageSec = Math.min(300, (now - state.lastTrueTime) / 1000);
+  const speed = groundSpeedKmh || 0;
+  const isStationary = speed < 5;
+  const ageSec = isStationary
+    ? Math.min(300, (now - state.lastTrueTime) / 1000)
+    : (now - state.lastTrueTime) / 1000;
   
   let estLat = state.lastTrueLat;
   let estLon = state.lastTrueLon;
   let estAlt = state.lastTrueAlt;
   
-  const speed = groundSpeedKmh || 0;
   const track = state.lastTrueTrack;
   
   if (speed > 0 && track != null) {
@@ -165,6 +168,41 @@ console.log("Running kinematics unit tests...");
   assert.ok(approxEqual(res.lon, -122.3 + expectedDLon), "Test 4 Failed: Longitude deviation");
   assert.strictEqual(res.altitudeFt, 8000 + (-1200 / 60) * 60, "Test 4 Failed: Altitude deviation");
   console.log("✓ Test 4 Passed: Left turn kinematics with descent");
+}
+
+// Test Case 5: Infinite prediction age for moving planes vs capped age for stationary planes
+{
+  const stationaryState = {
+    lastTrueLat: 47.6,
+    lastTrueLon: -122.3,
+    lastTrueAlt: 5000,
+    lastTrueTrack: 0,
+    lastTrueTime: 10000,
+    turnRateDegPerSec: 0
+  };
+  
+  const movingState = {
+    ...stationaryState
+  };
+
+  const now = 610000; // 600 seconds later
+  
+  // 1. Stationary plane (speed = 0)
+  const resStationary = estimatePositionFromState(stationaryState, now, 0, 120); // 120 FPM climb
+  // Expected ageSec should be capped at 300.
+  // Expected altitude: 5000 + (120 / 60) * 300 = 5600
+  assert.strictEqual(resStationary.altitudeFt, 5600, "Test 5 Failed: Stationary plane prediction age should be capped at 300s");
+
+  // 2. Moving plane (speed = 360 km/h)
+  const resMoving = estimatePositionFromState(movingState, now, 360, 120);
+  // Expected ageSec should be 600 (not capped).
+  // Expected displacement: speed (0.1 km/s) * 600s = 60 km
+  // Expected latitude change: 60 km / 111.32 = 0.5389867 degrees
+  // Expected altitude: 5000 + (120 / 60) * 600 = 6200
+  assert.ok(approxEqual(resMoving.lat, 47.6 + (60.0 / 111.32)), "Test 5 Failed: Moving plane latitude deviation");
+  assert.strictEqual(resMoving.altitudeFt, 6200, "Test 5 Failed: Moving plane prediction age should not be capped");
+  
+  console.log("✓ Test 5 Passed: Infinite prediction age for moving planes vs capped age for stationary planes");
 }
 
 console.log("All unit tests passed successfully!");

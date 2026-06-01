@@ -115,13 +115,16 @@ function lerpAngle(current, target, factor) {
 function estimatePositionFromState(state, now, groundSpeedKmh, verticalRateFpm) {
   if (state.lastTrueLat == null || state.lastTrueLon == null) return null;
   
-  const ageSec = Math.min(300, (now - state.lastTrueTime) / 1000);
+  const speed = groundSpeedKmh || 0;
+  const isStationary = speed < 5;
+  const ageSec = isStationary
+    ? Math.min(300, (now - state.lastTrueTime) / 1000)
+    : (now - state.lastTrueTime) / 1000;
   
   let estLat = state.lastTrueLat;
   let estLon = state.lastTrueLon;
   let estAlt = state.lastTrueAlt;
   
-  const speed = groundSpeedKmh || 0;
   const track = state.lastTrueTrack;
   
   if (speed > 0 && track != null) {
@@ -200,7 +203,10 @@ async function fetchAirspace() {
     config = data.config;
     
     if (data.selected) {
-      currentSelectedHex = data.selected.hex;
+      const currentActive = currentSelectedHex ? planeStates.get(currentSelectedHex) : null;
+      if (!currentActive) {
+        currentSelectedHex = data.selected.hex;
+      }
     }
     
     // Update plane states (turn rate & smooth position trackers)
@@ -386,7 +392,8 @@ function renderLoop() {
   for (const [hex, state] of planeStates.entries()) {
     // Prune stale static planes (no update for 300s / 5 mins)
     const ageSinceLastTrue = now - state.lastTrueTime;
-    if (ageSinceLastTrue > 300000) {
+    const isStationary = !state.groundSpeedKmh || state.groundSpeedKmh < 5;
+    if (isStationary && ageSinceLastTrue > 300000) {
       planeStates.delete(hex);
       const trail = flightTrails.get(hex);
       if (trail) trail.active = false;
