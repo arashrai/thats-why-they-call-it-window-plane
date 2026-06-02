@@ -79,10 +79,7 @@ function renderLoop() {
     trail.active = false;
   }
 
-  // 2. Append periodic dead-reckoned trail predictions
-  stateManager.appendTrailPredictions(now, config, lastPayload.maxDistanceKm);
-
-  // 3. Render all planes from our persistent state map
+  // 2. Render all planes from our persistent state map
   const secondaryPlanes = [];
   let activeSelectedTargetObject = null;
 
@@ -176,6 +173,9 @@ function renderLoop() {
       }
     }
   }
+
+  // 3. Append periodic dead-reckoned trail predictions
+  stateManager.appendTrailPredictions(now, config, lastPayload.maxDistanceKm);
 
   // 4. Decay and prune trails
   stateManager.decayTrails(now);
