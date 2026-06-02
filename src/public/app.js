@@ -248,7 +248,23 @@ async function fetchAirspace() {
     // Update plane states (turn rate & smooth position trackers)
     updatePlaneStates(data.aircraft || []);
     
-    currentSelectedHex = data.selected ? data.selected.hex : null;
+    const serverSelectedHex = data.selected ? data.selected.hex : null;
+    if (serverSelectedHex) {
+      currentSelectedHex = serverSelectedHex;
+    } else if (currentSelectedHex) {
+      // Keep selected aircraft for a 15-second grace period in case of weak/intermittent signals
+      const activeState = planeStates.get(currentSelectedHex);
+      if (activeState) {
+        const ageSec = (Date.now() - activeState.lastTrueTime) / 1000;
+        if (ageSec > 15.0) {
+          currentSelectedHex = null;
+        }
+      } else {
+        currentSelectedHex = null;
+      }
+    } else {
+      currentSelectedHex = null;
+    }
     
     // Hide error overlay
     errorOverlayEl.classList.add("hidden");
