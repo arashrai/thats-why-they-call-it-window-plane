@@ -1,20 +1,20 @@
 # That's Why They Call It Window Plane ✈️
 
-A local-first, premium aircraft HUD and radar tracking system designed to run on a Raspberry Pi 5 with a projector displaying aircraft movements on your ceiling.
+A local-first aircraft HUD and radar tracking system designed to run on a Raspberry Pi 5 with a projector displaying aircraft movements on your ceiling.
 
-Perfect for flats and high-rise apartments to visually track and catalog aircraft flying overhead in real time.
+Visually tracks aircraft flying overhead in real time.
 
 ---
 
 ## Key Features
 
-- **Buttery Smooth 60fps Interpolation**: Uses client-side dead reckoning based on reported speed, track heading, and vertical rates to slide the target reticle and tracking chevron continuously between server updates.
-- **Dynamic Flight Route Lookups**: Automatically fetches carrier names, origin, and destination airports (e.g., `SFO ➔ SEA`) via the ADSBDB API and caches them locally to ensure instant load times and zero network congestion.
-- **Distance-Based Target Selection**: Automatically targets and tracks the closest active aircraft within the custom maximum distance range boundary, featuring distance hysteresis to prevent selection flashing.
-- **Rotatable Compass Calibration**: Automatically aligns North, East, South, and West to match your room's physical orientation using simple configuration settings.
-- **Projector-Optimized Aesthetics**: Designed with a pure black (`#000000`) background to eliminate light leakage on your ceiling, detailed with high-contrast glowing cyan and amber elements.
-- **Live Local Airspace Feed**: Tracks nearby planes entering the airspace, including climb/descent trend states and elevation angles.
-- **Developer Simulation Mode**: Includes an offline aircraft simulator to build and test the HUD features directly on your laptop without needing an active SDR receiver.
+- **25 FPS Client-Side Interpolation**: Uses dead reckoning based on speed, track heading, and vertical rates to smooth target movements between receiver updates.
+- **FlightStats-Based Route Scraper**: Automatically fetches carrier names, origin, and destination airports for flights to/from SEA airport via public APIs and caches them locally.
+- **Distance-Based Target Selection**: Targets and tracks the closest active aircraft within the maximum distance range boundary, using hysteresis to prevent selection switching/flashing.
+- **Compass Calibration**: Aligns the grid coordinates to match your room's physical orientation using down-bearing configuration offsets.
+- **Projector-Optimized Aesthetics**: Uses a pure black (`#000000`) background to prevent light leakage on ceiling displays, with high-contrast cyan and amber elements.
+- **Airspace Overview**: Tracks nearby aircraft in the area, displaying distance, altitude, climbs/descents, and bearings.
+- **Offline Simulator**: Includes a mock flight telemetry generator to test HUD rendering without an active SDR receiver.
 
 ---
 
