@@ -11,9 +11,7 @@ const airlineNameEl = document.getElementById("airline-name");
 const flightCallsignEl = document.getElementById("flight-callsign");
 const aircraftTypeEl = document.getElementById("aircraft-type");
 const maxDistLimitEl = document.getElementById("max-dist-limit");
-const ringLabelInnerEl = document.getElementById("ring-label-inner");
-const ringLabelMidEl = document.getElementById("ring-label-mid");
-const ringLabelOuterEl = document.getElementById("ring-label-outer");
+
 
 // Route Elements
 const routeDisplayEl = document.getElementById("route-display");
@@ -223,6 +221,7 @@ const planeStates = new Map();
 // Interpolated display state
 let currentHex = null;
 let currentSelectedHex = null;
+let displaySelectedHex = null;
 let displayedX = 0;
 let displayedY = 0;
 let displayedUiAngle = 0;
@@ -249,27 +248,31 @@ async function fetchAirspace() {
     updatePlaneStates(data.aircraft || []);
     
     const serverSelectedHex = data.selected ? data.selected.hex : null;
+    
+    // Always sync currentSelectedHex with the server's selection
+    currentSelectedHex = serverSelectedHex;
+    
     if (serverSelectedHex) {
-      currentSelectedHex = serverSelectedHex;
-    } else if (currentSelectedHex) {
-      // If the previously selected aircraft is still active in the server payload
-      // but the server explicitly deselected it (e.g. flew out of range), drop it immediately.
-      // Otherwise, if it disappeared due to signal dropout, keep it for a 15s grace period.
-      const isStillInPayload = (data.aircraft || []).some(a => a.hex === currentSelectedHex);
-      const activeState = planeStates.get(currentSelectedHex);
+      displaySelectedHex = serverSelectedHex;
+    } else if (displaySelectedHex) {
+      // If the previously displayed aircraft was displaySelectedHex, check if we keep it
+      const isStillInPayload = (data.aircraft || []).some(a => a.hex === displaySelectedHex);
+      const activeState = planeStates.get(displaySelectedHex);
       
       if (isStillInPayload) {
-        currentSelectedHex = null;
+        // Still active in readsb payload but explicitly deselected by the server (e.g. out of range)
+        displaySelectedHex = null;
       } else if (activeState) {
+        // Disappeared from payload (signal dropout). Keep it for 15s grace period.
         const ageSec = (Date.now() - activeState.lastTrueTime) / 1000;
         if (ageSec > 15.0) {
-          currentSelectedHex = null;
+          displaySelectedHex = null;
         }
       } else {
-        currentSelectedHex = null;
+        displaySelectedHex = null;
       }
     } else {
-      currentSelectedHex = null;
+      displaySelectedHex = null;
     }
     
     // Hide error overlay
@@ -281,9 +284,7 @@ async function fetchAirspace() {
       compassGroupEl.style.transform = `rotate(${compassRotationOffset}deg)`;
       maxDistLimitEl.textContent = lastPayload.maxDistanceKm;
       
-      // Update dynamic ring distance labels
-      const maxDist = lastPayload.maxDistanceKm;
-      if (ringLabelOuterEl) ringLabelOuterEl.textContent = `${maxDist.toFixed(1)} km`;
+
     }
     
     updateNearbyAirspace(data.nearby);
@@ -441,9 +442,9 @@ function updatePlaneStates(allPlanes) {
   for (const [hex, state] of planeStates.entries()) {
     if (!presentHexes.has(hex)) {
       const ageSec = (now - state.lastTrueTime) / 1000;
-      // If it hasn't been updated for 30 seconds and is not the currently selected plane, delete it.
+      // If it hasn't been updated for 30 seconds and is not the currently displayed plane, delete it.
       // (Keep the selected plane in planeStates so we can draw it / predict it for up to 15s)
-      const isSelected = currentSelectedHex && hex === currentSelectedHex;
+      const isSelected = displaySelectedHex && hex === displaySelectedHex;
       if (ageSec > 30.0 && !isSelected) {
         planeStates.delete(hex);
       }
@@ -504,10 +505,17 @@ function renderLoop() {
   let activeSelected = null;
 
   // Track selection state
-  if (currentSelectedHex) {
-    activeSelected = planeStates.get(currentSelectedHex);
+  if (displaySelectedHex) {
+    activeSelected = planeStates.get(displaySelectedHex);
     if (!activeSelected) {
-      currentSelectedHex = null;
+      displaySelectedHex = null;
+    } else {
+      // Check if local grace period has expired (15 seconds since last true update)
+      const ageSec = (now - activeSelected.lastTrueTime) / 1000;
+      if (ageSec > 15.0) {
+        displaySelectedHex = null;
+        activeSelected = null;
+      }
     }
   }
 
@@ -517,7 +525,7 @@ function renderLoop() {
     const ageSinceLastTrue = now - state.lastTrueTime;
 
     let estPos = state.lastCachedEstPos;
-    const isSelected = currentSelectedHex && hex === currentSelectedHex;
+    const isSelected = displaySelectedHex && hex === displaySelectedHex;
     const isStaleForCalc = ageSinceLastTrue >= 10000 && !isSelected;
     const shouldRecalc = !estPos || 
                          !isStaleForCalc || 
