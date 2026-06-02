@@ -5,7 +5,8 @@ export function isSelectableAircraft(a) {
     a.lat != null &&
     a.lon != null &&
     a.distanceKm != null &&
-    a.distanceKm <= config.home.maxDistanceKm
+    a.distanceKm <= config.home.maxDistanceKm &&
+    (a.seenSec == null || a.seenSec <= 10.0)
   );
 }
 
@@ -14,7 +15,8 @@ export function isStillSelectableAircraft(a) {
     a.lat != null &&
     a.lon != null &&
     a.distanceKm != null &&
-    a.distanceKm <= (config.home.maxDistanceKm + 1.0)
+    a.distanceKm <= (config.home.maxDistanceKm + 1.0) &&
+    (a.seenSec == null || a.seenSec <= 15.0)
   );
 }
 

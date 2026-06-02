@@ -149,4 +149,46 @@ console.log("Running target selection unit tests...");
   console.log("✓ Test 6 Passed: Target switch on current selection dropout");
 }
 
+// Test Case 7: Stale signal aircraft is not selectable for new tracking
+{
+  const planeStale = {
+    hex: "a00001",
+    lat: 47.6,
+    lon: -122.3,
+    distanceKm: 5.0,
+    seenSec: 12.0 // > 10.0s limit for new selection
+  };
+  assert.strictEqual(isSelectableAircraft(planeStale), false, "Stale plane (seen > 10s) should not be selectable for new tracking");
+  console.log("✓ Test 7 Passed: Stale aircraft rejected for new tracking");
+}
+
+// Test Case 8: Active selection switches to fresh target when current selection becomes stale
+{
+  // Current active is "a00001" (at 5.0 km, but stale with seenSec = 16.0s)
+  // Fresh plane "a00002" is at 7.0 km (fresh with seenSec = 1.0s)
+  const aircraftList = [
+    {
+      hex: "a00001",
+      lat: 47.6,
+      lon: -122.3,
+      distanceKm: 5.0,
+      seenSec: 16.0, // > 15s limit for keeping active tracking
+      isSelectable: false
+    },
+    {
+      hex: "a00002",
+      lat: 47.61,
+      lon: -122.31,
+      distanceKm: 7.0,
+      seenSec: 1.0,
+      isSelectable: true
+    }
+  ];
+
+  const selected = selectActiveAircraft(aircraftList, "a00001");
+  assert.ok(selected, "Should have a selected target");
+  assert.strictEqual(selected.hex, "a00002", "Should switch to fresh target when active selection exceeds staleness threshold");
+  console.log("✓ Test 8 Passed: Selection switches to fresh target on active selection staleness");
+}
+
 console.log("All selection tests passed successfully!");

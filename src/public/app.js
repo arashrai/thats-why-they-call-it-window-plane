@@ -91,6 +91,7 @@ function renderLoop() {
     // Prune selections locally if grace period expired
     if (displaySelectedHex && hex === displaySelectedHex && ageSinceLastTrue > 15000) {
       stateManager.displaySelectedHex = null;
+      stateManager.currentSelectedHex = null;
       continue;
     }
 
