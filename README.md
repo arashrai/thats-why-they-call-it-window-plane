@@ -10,6 +10,7 @@ Perfect for flats and high-rise apartments to visually track and catalog aircraf
 
 - **Buttery Smooth 60fps Interpolation**: Uses client-side dead reckoning based on reported speed, track heading, and vertical rates to slide the target reticle and tracking chevron continuously between server updates.
 - **Dynamic Flight Route Lookups**: Automatically fetches carrier names, origin, and destination airports (e.g., `SFO ➔ SEA`) via the ADSBDB API and caches them locally to ensure instant load times and zero network congestion.
+- **Distance-Based Target Selection**: Automatically targets and tracks the closest active aircraft within the custom maximum distance range boundary, featuring distance hysteresis to prevent selection flashing.
 - **Rotatable Compass Calibration**: Automatically aligns North, East, South, and West to match your room's physical orientation using simple configuration settings.
 - **Projector-Optimized Aesthetics**: Designed with a pure black (`#000000`) background to eliminate light leakage on your ceiling, detailed with high-contrast glowing cyan and amber elements.
 - **Live Local Airspace Feed**: Tracks nearby planes entering the airspace, including climb/descent trend states and elevation angles.
@@ -52,8 +53,6 @@ HOME_ELEVATION_FT=350
 
 # Max tracking distance (planes outside this range won't lock on)
 MAX_DISTANCE_KM=10
-MIN_ELEVATION_ANGLE_DEG=0
-MAX_ELEVATION_ANGLE_DEG=85
 
 # Projector Calibration
 # What bearing (0-360°) is straight down on your ceiling?
@@ -85,7 +84,13 @@ You can run and test the HUD locally on your development machine using mock trac
    npm run dev
    ```
 
-4. Open your browser to [http://localhost:3000](http://localhost:3000). The radar will acquire simulated flights crossing the Seattle airspace and track them in real time.
+4. **Run unit tests**:
+   You can run tests for dead-reckoning calculations and target selection logic:
+   ```bash
+   npm test
+   ```
+
+5. Open your browser to [http://localhost:3000](http://localhost:3000). The radar will acquire simulated flights crossing the Seattle airspace and track them in real time.
 
 ---
 

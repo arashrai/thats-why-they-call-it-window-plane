@@ -8,8 +8,6 @@ const HOME = {
   lon: Number(process.env.HOME_LON),
   elevationFt: Number(process.env.HOME_ELEVATION_FT || 350),
   maxDistanceKm: Number(process.env.MAX_DISTANCE_KM || 10),
-  minElevationAngleDeg: Number(process.env.MIN_ELEVATION_ANGLE_DEG || 0),
-  maxElevationAngleDeg: Number(process.env.MAX_ELEVATION_ANGLE_DEG || 85),
   downBearingDeg: Number(process.env.DOWN_BEARING_DEG || 120),
   bearingToUiScale: Number(process.env.BEARING_TO_UI_SCALE || 1)
 };

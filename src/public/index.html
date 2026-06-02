@@ -106,40 +106,45 @@
             <!-- Grid of metrics -->
             <div class="metrics-grid">
               <div class="metric-box">
-                <div class="metric-label font-hud">ALTITUDE</div>
-                <div class="metric-value-row">
+                <div class="metric-main-row">
+                  <span class="metric-label font-hud">ALT</span>
                   <span id="metric-altitude" class="metric-value font-hud">4,200</span>
                   <span class="metric-unit">FT</span>
-                  <span id="vertical-trend-icon" class="trend-icon">▲</span>
                 </div>
-                <div id="metric-vertical-rate" class="metric-subtext">+640 FPM</div>
+                <div class="metric-sub-row">
+                  <span id="vertical-trend-icon" class="trend-icon">▲</span>
+                  <span id="metric-vertical-rate" class="metric-subtext">+640 FPM</span>
+                </div>
               </div>
 
               <div class="metric-box highlighted">
-                <div class="metric-label font-hud">PROXIMITY</div>
-                <div class="metric-value-row">
+                <div class="metric-main-row">
+                  <span class="metric-label font-hud">DST</span>
                   <span id="metric-distance" class="metric-value font-hud">4.8</span>
                   <span class="metric-unit">KM</span>
                 </div>
-                <div id="metric-elevation" class="metric-subtext">HIGH IN SKY (32° up)</div>
+                <div class="metric-sub-row">
+                  <span id="metric-elevation" class="metric-subtext">HIGH IN SKY (32° up)</span>
+                </div>
               </div>
 
               <div class="metric-box">
-                <div class="metric-label font-hud">SPEED</div>
-                <div class="metric-value-row">
+                <div class="metric-main-row">
+                  <span class="metric-label font-hud">SPD</span>
                   <span id="metric-speed" class="metric-value font-hud">408</span>
                   <span class="metric-unit">KM/H</span>
                 </div>
-                <div class="metric-subtext">GROUND SPEED</div>
               </div>
 
               <div class="metric-box">
-                <div class="metric-label font-hud">BEARING</div>
-                <div class="metric-value-row">
+                <div class="metric-main-row">
+                  <span class="metric-label font-hud">BRG</span>
                   <span id="metric-bearing" class="metric-value font-hud">134</span>
-                  <span class="metric-unit">DEG</span>
+                  <span class="metric-unit">°</span>
                 </div>
-                <div id="metric-bearing-direction" class="metric-subtext">SOUTHEAST</div>
+                <div class="metric-sub-row">
+                  <span id="metric-bearing-direction" class="metric-subtext">SOUTHEAST</span>
+                </div>
               </div>
             </div>
 

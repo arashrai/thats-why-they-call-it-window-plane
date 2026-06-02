@@ -45,7 +45,7 @@ export function bearingToUiAngleDeg(bearingFromHomeDeg, downBearingDeg, bearingT
 }
 
 export function getCardinalDirection(bearing) {
-  const directions = ["NORTH", "NORTHEAST", "EAST", "SOUTHEAST", "SOUTH", "SOUTHWEST", "WEST", "NORTHWEST"];
+  const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
   const index = Math.round(bearing / 45) % 8;
   return directions[index];
 }

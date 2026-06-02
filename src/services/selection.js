@@ -5,10 +5,7 @@ export function isSelectableAircraft(a) {
     a.lat != null &&
     a.lon != null &&
     a.distanceKm != null &&
-    a.elevationAngleDeg != null &&
-    a.distanceKm <= config.home.maxDistanceKm &&
-    a.elevationAngleDeg >= config.home.minElevationAngleDeg &&
-    a.elevationAngleDeg <= config.home.maxElevationAngleDeg
+    a.distanceKm <= config.home.maxDistanceKm
   );
 }
 
@@ -17,10 +14,7 @@ export function isStillSelectableAircraft(a) {
     a.lat != null &&
     a.lon != null &&
     a.distanceKm != null &&
-    a.elevationAngleDeg != null &&
-    a.distanceKm <= (config.home.maxDistanceKm + 1.0) &&
-    a.elevationAngleDeg >= (config.home.minElevationAngleDeg - 2.0) &&
-    a.elevationAngleDeg <= (config.home.maxElevationAngleDeg + 2.0)
+    a.distanceKm <= (config.home.maxDistanceKm + 1.0)
   );
 }
 

@@ -68,7 +68,7 @@ export class TelemetryPanel {
 
     // Proximity
     this.metricDistanceEl.textContent = target.slantRangeKm.toFixed(1);
-    this.metricElevationEl.textContent = `${target.elevationDesc} (${Math.round(target.elevationAngle)}° up)`;
+    this.metricElevationEl.textContent = `${Math.round(target.elevationAngle)}° UP (${target.elevationDesc})`;
 
     // Speed
     this.metricSpeedEl.textContent = Math.round(target.groundSpeedKmh || 0);
