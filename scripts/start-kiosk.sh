@@ -9,6 +9,7 @@ mkdir -p "$EMPTY_CURSOR_DIR"
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 export XCURSOR_PATH="$EMPTY_CURSOR_DIR"
 export XCURSOR_THEME=none
+export WLR_NO_HARDWARE_CURSORS=1
 
 exec dbus-run-session -- cage -- chromium \
   --kiosk \

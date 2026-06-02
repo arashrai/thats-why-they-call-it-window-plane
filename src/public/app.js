@@ -1,13 +1,10 @@
 // DOM Elements
-const appContainer = document.getElementById("app");
-const systemStatusEl = document.getElementById("system-status");
 const errorOverlayEl = document.getElementById("error-overlay");
 const errorMessageEl = document.getElementById("error-message");
 
 // Flight Data Panel Elements
 const flightDataEl = document.getElementById("flight-data");
 const noFlightCardEl = document.getElementById("no-flight-card");
-const airlineNameEl = document.getElementById("airline-name");
 const flightCallsignEl = document.getElementById("flight-callsign");
 const aircraftTypeEl = document.getElementById("aircraft-type");
 const maxDistLimitEl = document.getElementById("max-dist-limit");
@@ -105,10 +102,7 @@ function lerp(start, end, factor) {
   return start + (end - start) * factor;
 }
 
-function lerpAngle(current, target, factor) {
-  let diff = signedAngularDiffDeg(target, current);
-  return current + diff * factor;
-}
+
 
 function calculateKinematicsFromCoords(coords) {
   if (coords.length < 3) return null;
@@ -219,7 +213,6 @@ const FRAME_INTERVAL = 1000 / TARGET_FPS;
 const planeStates = new Map();
 
 // Interpolated display state
-let currentHex = null;
 let currentSelectedHex = null;
 let displaySelectedHex = null;
 let displayedX = 0;
@@ -228,7 +221,6 @@ let displayedUiAngle = 0;
 
 // Multi-plane trails collection (hex => { points: [{x, y, t, isVerified}], opacity: 1.0, active: boolean })
 const flightTrails = new Map();
-let lastTrailPointTime = 0;
 
 // API polling
 async function fetchAirspace() {
@@ -665,7 +657,6 @@ function renderLoop() {
     targetGroupEl.classList.add("hidden");
     radarArrowOrbitEl.classList.add("hidden");
     scanningOverlayEl.classList.remove("hidden");
-    currentHex = null;
     return;
   }
 
@@ -723,9 +714,6 @@ function renderLoop() {
     arrowBearingLabelEl.textContent = `${Math.round(sBearing).toString().padStart(3, "0")}°`;
 
     // Update Text Dashboard
-    if (airlineNameEl) {
-      airlineNameEl.textContent = activeSelected.route?.airline || (activeSelected.displayName.startsWith("a") ? "AIRCRAFT" : "COMMERCIAL FLIGHT");
-    }
     flightCallsignEl.textContent = activeSelected.displayName;
     aircraftTypeEl.textContent = activeSelected.aircraftType || "Aircraft type unknown";
 
