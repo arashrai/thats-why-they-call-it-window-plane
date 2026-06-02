@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd /home/arash/projects/thats-why-they-call-it-window-plane
+# Dynamically resolve repository root
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_DIR"
 
 git pull
 chmod +x scripts/*.sh
