@@ -164,14 +164,16 @@ function renderLoop() {
         y
       };
     } else {
-      // Package secondary target details
-      const targetClass = ageSinceLastTrue < 1200 ? "secondary-target-dot verified" : "secondary-target-dot predicted";
-      secondaryPlanes.push({
-        x,
-        y,
-        name: state.displayName,
-        class: targetClass
-      });
+      // Package secondary target details only if within the radar range limit
+      if (distKm <= lastPayload.maxDistanceKm) {
+        const targetClass = ageSinceLastTrue < 1200 ? "secondary-target-dot verified" : "secondary-target-dot predicted";
+        secondaryPlanes.push({
+          x,
+          y,
+          name: state.displayName,
+          class: targetClass
+        });
+      }
     }
   }
 
