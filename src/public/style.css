@@ -32,7 +32,7 @@ body {
 }
 
 .font-muted {
-  color: rgba(255, 255, 255, 0.55);
+  color: #ffffff;
 }
 
 .hidden {
@@ -89,7 +89,7 @@ body {
 }
 
 .ring-outer {
-  stroke: #0055ff;
+  stroke: var(--accent-cyan);
   stroke-width: 3;
 }
 
@@ -165,7 +165,7 @@ body {
   font-family: var(--font-hud);
   font-size: 11px;
   font-weight: 900;
-  fill: rgba(255, 255, 255, 0.95);
+  fill: #ffffff;
   text-anchor: middle;
 }
 
@@ -331,7 +331,7 @@ body {
 .aircraft-type {
   font-size: clamp(18px, 2.2vw, 24px);
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.85);
+  color: #ffffff;
   line-height: 1.2;
 }
 
@@ -364,7 +364,7 @@ body {
 
 .airport-name {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.65);
+  color: #ffffff;
   margin-top: 1px;
   white-space: nowrap;
   overflow: hidden;
@@ -416,7 +416,7 @@ body {
   font-family: var(--font-hud);
   font-size: 14px;
   font-weight: 800;
-  color: rgba(255, 255, 255, 0.65);
+  color: #ffffff;
   letter-spacing: 0.05em;
   margin-bottom: 2px;
 }
@@ -448,7 +448,7 @@ body {
 .metric-unit {
   font-size: 14px;
   font-weight: 800;
-  color: rgba(255, 255, 255, 0.7);
+  color: #ffffff;
 }
  
 .metric-subtext {
@@ -473,7 +473,7 @@ body {
 /* Signal update timer */
 .signal-age {
   font-size: 16px;
-  color: rgba(255, 255, 255, 0.55);
+  color: #ffffff;
   font-weight: 700;
   text-align: right;
 }
@@ -495,14 +495,14 @@ body {
 
 .no-flight-card h2 {
   font-family: var(--font-hud);
-  font-size: 24px;
+  font-size: 32px;
   color: #ffffff;
   margin-bottom: 10px;
 }
 
 .no-flight-card p {
-  font-size: 18px;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 22px;
+  color: #ffffff;
 }
 
 /* Sonar wave pulse animation removed for minimalism */
@@ -519,7 +519,7 @@ body {
 .panel-subtitle {
   font-family: var(--font-hud);
   font-size: 18px;
-  color: rgba(255, 255, 255, 0.55);
+  color: #ffffff;
   font-weight: 800;
   letter-spacing: 0.05em;
 }
@@ -564,7 +564,7 @@ body {
 }
 
 .nearby-route {
-  color: rgba(255, 255, 255, 0.7);
+  color: #ffffff;
   font-size: 15px;
   text-align: center;
   white-space: nowrap;
@@ -585,15 +585,15 @@ body {
 }
 
 .nearby-alt {
-  color: rgba(255, 255, 255, 0.55);
+  color: #ffffff;
 }
 
 .nearby-empty {
-  font-size: 18px;
-  color: rgba(255, 255, 255, 0.4);
+  font-size: 22px;
+  color: #ffffff;
   text-align: center;
   padding: 18px 0;
-  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border: 1px dashed rgba(255, 255, 255, 0.2);
   border-radius: 6px;
 }
 
@@ -625,7 +625,7 @@ body {
 }
 
 .error-box p {
-  color: rgba(255, 255, 255, 0.7);
+  color: #ffffff;
   font-size: 13px;
 }
 

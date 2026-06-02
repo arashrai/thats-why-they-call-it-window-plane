@@ -297,8 +297,12 @@ async function fetchAirspace() {
 function updatePlaneStates(allPlanes) {
   const now = Date.now();
   
+  // Track hexes present in the current update
+  const presentHexes = new Set();
+  
   allPlanes.forEach(plane => {
     if (plane.hex == null) return;
+    presentHexes.add(plane.hex);
     
     let state = planeStates.get(plane.hex);
     const newTrueTime = now - (plane.seenPosSec || plane.seenSec || 0) * 1000;
@@ -432,6 +436,19 @@ function updatePlaneStates(allPlanes) {
       state.turnRateDegPerSec = turnRate;
     }
   });
+
+  // Prune stale planes from planeStates
+  for (const [hex, state] of planeStates.entries()) {
+    if (!presentHexes.has(hex)) {
+      const ageSec = (now - state.lastTrueTime) / 1000;
+      // If it hasn't been updated for 30 seconds and is not the currently selected plane, delete it.
+      // (Keep the selected plane in planeStates so we can draw it / predict it for up to 15s)
+      const isSelected = currentSelectedHex && hex === currentSelectedHex;
+      if (ageSec > 30.0 && !isSelected) {
+        planeStates.delete(hex);
+      }
+    }
+  }
 }
 
 function updateNearbyAirspace(nearby) {
@@ -516,13 +533,6 @@ function renderLoop() {
     const distNm = haversineNm(config.homeLat, config.homeLon, estPos.lat, estPos.lon);
     const distKm = distNm * 1.852;
 
-    // Prune planes that have departed the circle
-    if (distKm > lastPayload.maxDistanceKm) {
-      planeStates.delete(hex);
-      const trail = flightTrails.get(hex);
-      if (trail) trail.active = false;
-      continue;
-    }
 
     const bearing = bearingDeg(config.homeLat, config.homeLon, estPos.lat, estPos.lon);
     const uiAngle = bearingToUiAngleDeg(bearing, config.downBearingDeg, config.bearingToUiScale);
