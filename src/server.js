@@ -376,11 +376,13 @@ function validateAndLogAircraft(a) {
   const hasCoords = typeof a.lat === "number" && typeof a.lon === "number";
   const alt = a.alt_baro ?? a.alt_geom;
   const hasAlt = alt != null && typeof alt === "number";
-  const hasTrack = a.track != null && typeof a.track === "number";
+  
+  // Track and groundspeed are optional, but we filter out stationary aircraft on the ground
+  // (e.g. speed < 10 kt and altitude < 1000 ft)
   const hasGs = a.gs != null && typeof a.gs === "number";
-  const isMoving = hasGs && a.gs >= 10;
+  const isStationary = hasGs && a.gs < 10 && (alt != null && alt < 1000);
 
-  const isValid = hasCoords && hasAlt && hasTrack && hasGs && isMoving;
+  const isValid = hasCoords && hasAlt && !isStationary;
 
   if (!isValid) {
     const callsign = a.flight?.trim().toUpperCase().replace(/\s+/g, "") || null;
@@ -391,9 +393,7 @@ function validateAndLogAircraft(a) {
         const reasons = [];
         if (!hasCoords) reasons.push("missing coordinates");
         if (!hasAlt) reasons.push("missing altitude");
-        if (!hasTrack) reasons.push("missing track");
-        if (!hasGs) reasons.push("missing groundspeed");
-        if (hasGs && !isMoving) reasons.push(`stationary (speed: ${a.gs} kt)`);
+        if (isStationary) reasons.push(`stationary ground target (speed: ${a.gs} kt, alt: ${alt} ft)`);
 
         console.log(`[Validation] Aircraft ${callsign} failed validation: ${reasons.join(", ")}`);
       }
@@ -545,8 +545,8 @@ app.get("/api/aircraft", async (req, res) => {
       if (currentActive && isStillSelectableAircraft(currentActive)) {
         const bestDistance = bestSelectable.distanceKm ?? Infinity;
         const currentDistance = currentActive.distanceKm ?? Infinity;
-        // Hysteresis threshold: new target must be at least 0.3 km closer to trigger selection switch
-        if (bestSelectable.hex !== clientSelectedHex && bestDistance < currentDistance - 0.3) {
+        // Hysteresis threshold: new target must be at least 0.1 km closer to trigger selection switch
+        if (bestSelectable.hex !== clientSelectedHex && bestDistance < currentDistance - 0.1) {
           selected = bestSelectable;
         } else {
           selected = currentActive;
