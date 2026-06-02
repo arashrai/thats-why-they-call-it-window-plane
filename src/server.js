@@ -404,30 +404,24 @@ function validateAndLogAircraft(a) {
 }
 
 function isSelectableAircraft(a) {
-  if (a.lat == null || a.lon == null || a.distanceKm == null || a.elevationAngleDeg == null) {
-    return false;
-  }
-  const altitudeAboveHomeFt = (a.altitudeFt ?? HOME.elevationFt) - HOME.elevationFt;
-  const altitudeAboveHomeKm = altitudeAboveHomeFt * 0.0003048;
-  const slantRangeKm = Math.sqrt(a.distanceKm * a.distanceKm + altitudeAboveHomeKm * altitudeAboveHomeKm);
-
   return (
-    slantRangeKm <= HOME.maxDistanceKm &&
+    a.lat != null &&
+    a.lon != null &&
+    a.distanceKm != null &&
+    a.elevationAngleDeg != null &&
+    a.distanceKm <= HOME.maxDistanceKm &&
     a.elevationAngleDeg >= HOME.minElevationAngleDeg &&
     a.elevationAngleDeg <= HOME.maxElevationAngleDeg
   );
 }
 
 function isStillSelectableAircraft(a) {
-  if (a.lat == null || a.lon == null || a.distanceKm == null || a.elevationAngleDeg == null) {
-    return false;
-  }
-  const altitudeAboveHomeFt = (a.altitudeFt ?? HOME.elevationFt) - HOME.elevationFt;
-  const altitudeAboveHomeKm = altitudeAboveHomeFt * 0.0003048;
-  const slantRangeKm = Math.sqrt(a.distanceKm * a.distanceKm + altitudeAboveHomeKm * altitudeAboveHomeKm);
-
   return (
-    slantRangeKm <= (HOME.maxDistanceKm + 1.0) &&
+    a.lat != null &&
+    a.lon != null &&
+    a.distanceKm != null &&
+    a.elevationAngleDeg != null &&
+    a.distanceKm <= (HOME.maxDistanceKm + 1.0) &&
     a.elevationAngleDeg >= (HOME.minElevationAngleDeg - 2.0) &&
     a.elevationAngleDeg <= (HOME.maxElevationAngleDeg + 2.0)
   );

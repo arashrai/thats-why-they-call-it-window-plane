@@ -1,7 +1,8 @@
 [Unit]
 Description=Window Plane Chromium Kiosk
-After=network-online.target windowplane.service
-Wants=network-online.target windowplane.service
+After=network-online.target windowplane.service systemd-user-sessions.service getty@tty7.service
+Wants=network-online.target windowplane.service systemd-logind.service
+Conflicts=getty@tty7.service
 
 [Service]
 Type=simple
@@ -12,6 +13,16 @@ Environment=XDG_RUNTIME_DIR=/run/user/1000
 ExecStart=/home/arash/projects/thats-why-they-call-it-window-plane/scripts/start-kiosk.sh
 Restart=always
 RestartSec=5
+
+# TTY and Session configuration to grant DRM/KMS permissions
+UtmpIdentifier=tty7
+UtmpMode=user
+TTYPath=/dev/tty7
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+PAMName=login
 
 [Install]
 WantedBy=multi-user.target
