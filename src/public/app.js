@@ -551,8 +551,8 @@ function renderLoop() {
       const targetClass = ageSinceLastTrue < 1200 ? "secondary-target-dot verified" : "secondary-target-dot predicted";
       secondaryHtml += `
         <g>
-          <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" class="${targetClass}" />
-          <text x="${x.toFixed(1)}" y="${(y + 9).toFixed(1)}" class="secondary-target-label">${state.displayName}</text>
+          <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.5" class="${targetClass}" />
+          <text x="${x.toFixed(1)}" y="${(y + 13).toFixed(1)}" class="secondary-target-label">${state.displayName}</text>
         </g>
       `;
     }
