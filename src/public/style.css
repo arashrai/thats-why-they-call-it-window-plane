@@ -67,7 +67,7 @@ body {
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  border: 1px solid var(--border-color);
+  border: 3px solid #0055ff;
   background-color: transparent;
   position: relative;
 }
@@ -84,23 +84,23 @@ body {
 
 .grid-ring {
   fill: none;
-  stroke: rgba(0, 240, 255, 0.08);
-  stroke-width: 1;
+  stroke: rgba(0, 240, 255, 0.15);
+  stroke-width: 1.5;
 }
 
 .ring-outer {
-  stroke: rgba(0, 240, 255, 0.18);
-  stroke-dasharray: 4 4;
+  stroke: #0055ff;
+  stroke-width: 3;
 }
 
 .grid-axis {
-  stroke: rgba(0, 240, 255, 0.08);
-  stroke-width: 1;
+  stroke: rgba(0, 240, 255, 0.35);
+  stroke-width: 1.5;
 }
 
 .grid-tick {
-  stroke: rgba(0, 240, 255, 0.2);
-  stroke-width: 1;
+  stroke: rgba(0, 240, 255, 0.5);
+  stroke-width: 1.5;
 }
 
 /* Rotatable Compass */

@@ -252,9 +252,15 @@ async function fetchAirspace() {
     if (serverSelectedHex) {
       currentSelectedHex = serverSelectedHex;
     } else if (currentSelectedHex) {
-      // Keep selected aircraft for a 15-second grace period in case of weak/intermittent signals
+      // If the previously selected aircraft is still active in the server payload
+      // but the server explicitly deselected it (e.g. flew out of range), drop it immediately.
+      // Otherwise, if it disappeared due to signal dropout, keep it for a 15s grace period.
+      const isStillInPayload = (data.aircraft || []).some(a => a.hex === currentSelectedHex);
       const activeState = planeStates.get(currentSelectedHex);
-      if (activeState) {
+      
+      if (isStillInPayload) {
+        currentSelectedHex = null;
+      } else if (activeState) {
         const ageSec = (Date.now() - activeState.lastTrueTime) / 1000;
         if (ageSec > 15.0) {
           currentSelectedHex = null;
