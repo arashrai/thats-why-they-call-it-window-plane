@@ -10,6 +10,7 @@ User=arash
 WorkingDirectory=/home/arash/projects/thats-why-they-call-it-window-plane
 Environment=HOME=/home/arash
 Environment=XDG_RUNTIME_DIR=/run/user/1000
+ExecStartPre=+/bin/chvt 7
 ExecStart=/home/arash/projects/thats-why-they-call-it-window-plane/scripts/start-kiosk.sh
 Restart=always
 RestartSec=5
