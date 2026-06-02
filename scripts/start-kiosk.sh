@@ -12,6 +12,7 @@ export XCURSOR_THEME=none
 export WLR_NO_HARDWARE_CURSORS=1
 
 exec dbus-run-session -- cage -- chromium \
+  --incognito \
   --kiosk \
   --noerrdialogs \
   --disable-infobars \

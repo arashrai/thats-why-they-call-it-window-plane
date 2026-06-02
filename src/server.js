@@ -11,6 +11,12 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Disable caching for all routes, including static files, to ensure real-time telemetry updates and prevent stale CSS/JS cache on the kiosk
+app.use((req, res, next) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+  next();
+});
+
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/api/aircraft", async (req, res) => {
