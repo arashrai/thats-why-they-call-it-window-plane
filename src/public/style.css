@@ -5,8 +5,8 @@
   --accent-amber: #ffb703;
   --border-color: rgba(255, 255, 255, 0.1);
   --panel-bg: transparent;
-  --font-hud: 'Orbitron', monospace;
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-hud: 'Share Tech Mono', monospace;
+  --font-sans: 'Outfit', system-ui, -apple-system, sans-serif;
 }
 
 /* Global Reset & Base Styling */
@@ -41,7 +41,7 @@ body {
 /* Two-column dashboard layout */
 .app-container {
   display: grid;
-  grid-template-columns: 55vw 45vw;
+  grid-template-columns: 62vw 38vw;
   height: 100vh;
   width: 100vw;
 }
@@ -57,7 +57,7 @@ body {
 }
 
 .radar-aspect-box {
-  width: min(85%, 80vh);
+  width: min(95%, 90vh);
   aspect-ratio: 1 / 1;
   position: relative;
 }
@@ -318,24 +318,24 @@ body {
 
 .airline-name {
   font-family: var(--font-hud);
-  font-size: clamp(12px, 1.5vw, 16px);
+  font-size: clamp(14px, 1.6vw, 18px);
   font-weight: 700;
   text-transform: uppercase;
   color: var(--accent-cyan);
   line-height: 1.2;
 }
-
+ 
 .flight-callsign {
   font-family: var(--font-hud);
-  font-size: clamp(48px, 6.5vw, 76px);
+  font-size: clamp(56px, 7.5vw, 88px);
   line-height: 1;
   font-weight: 900;
   color: #ffffff;
   letter-spacing: -0.01em;
 }
-
+ 
 .aircraft-type {
-  font-size: clamp(14px, 1.8vw, 18px);
+  font-size: clamp(16px, 2vw, 20px);
   color: rgba(255, 255, 255, 0.7);
   line-height: 1.2;
 }
@@ -362,7 +362,7 @@ body {
 
 .airport-code {
   font-family: var(--font-hud);
-  font-size: clamp(22px, 3vw, 36px);
+  font-size: clamp(26px, 3.5vw, 42px);
   font-weight: 900;
   line-height: 1.1;
 }
@@ -390,64 +390,74 @@ body {
 /* Metrics Grid (Locked Sizes) */
 .metrics-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
   width: 100%;
 }
-
+ 
 .metric-box {
   background-color: var(--panel-bg);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  padding: 12px 15px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  height: 105px;
+  padding: 8px 16px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    "label value"
+    "subtext value";
+  align-items: center;
+  height: 62px;
   box-sizing: border-box;
   overflow: hidden;
 }
-
+ 
 .metric-box.highlighted {
   border-color: var(--accent-amber);
 }
-
+ 
 .metric-label {
+  grid-area: label;
   font-family: var(--font-hud);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.4);
   letter-spacing: 0.05em;
+  margin-bottom: 2px;
 }
-
+ 
 .metric-value-row {
+  grid-area: value;
+  justify-self: end;
+  align-self: center;
   display: flex;
   align-items: baseline;
   gap: 4px;
   white-space: nowrap;
   overflow: hidden;
 }
-
+ 
 .metric-value {
   font-family: var(--font-hud);
-  font-size: clamp(22px, 3.2vw, 32px);
+  font-size: clamp(26px, 3.5vw, 36px);
   font-weight: 900;
   line-height: 1;
   font-variant-numeric: tabular-nums;
   color: #ffffff;
 }
-
+ 
 .metric-box.highlighted .metric-value {
   color: var(--accent-amber);
 }
-
+ 
 .metric-unit {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.5);
 }
-
+ 
 .metric-subtext {
+  grid-area: subtext;
   font-size: 11px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.6);
@@ -455,13 +465,13 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-top: auto;
+  margin-top: 0;
 }
-
+ 
 .trend-icon {
   font-size: 14px;
   color: #10b981;
-  margin-left: auto;
+  margin-left: 6px;
   align-self: center;
 }
 
@@ -522,8 +532,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 20vh;
+  height: 128px;
   overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .nearby-list::-webkit-scrollbar {

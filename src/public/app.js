@@ -96,10 +96,11 @@ function getCardinalDirection(bearing) {
 
 function getElevationDescription(deg) {
   if (deg == null) return "";
-  if (deg < 15) return "NEAR THE HORIZON";
-  if (deg < 45) return "LOW IN SKY";
-  if (deg < 75) return "HIGH IN SKY";
-  return "STRAIGHT UP (ZENITH)";
+  if (deg < 10) return "NEAR THE HORIZON";
+  if (deg < 25) return "LOW IN SKY";
+  if (deg < 50) return "MID SKY";
+  if (deg < 80) return "HIGH IN SKY";
+  return "DIRECTLY OVERHEAD (ZENITH)";
 }
 
 function lerp(start, end, factor) {
@@ -498,18 +499,33 @@ function renderLoop() {
     if (!state.lastPredPointTime) {
       state.lastPredPointTime = now;
     }
-    if (now - state.lastPredPointTime > 300) {
-      const lastPoint = trail.points[trail.points.length - 1];
-      const timeSinceLastPoint = lastPoint ? (now - lastPoint.t) : Infinity;
-      if (timeSinceLastPoint > 100) {
-        trail.points.push({
-          x: x_unclamped,
-          y: y_unclamped,
-          t: now,
-          isVerified: false
-        });
+    const predInterval = 300;
+    const elapsedPred = now - state.lastPredPointTime;
+    if (elapsedPred > predInterval) {
+      // Generate points to catch up if we were in background (cap at 60s to avoid overload)
+      const catchUpTime = Math.min(60000, elapsedPred);
+      const numPoints = Math.floor(catchUpTime / predInterval);
+      for (let i = 1; i <= numPoints; i++) {
+        const tPoint = state.lastPredPointTime + i * predInterval;
+        const estPosAtT = estimatePositionFromState(state, tPoint, state.groundSpeedKmh, state.verticalRateFpm);
+        if (estPosAtT) {
+          const distNmAtT = haversineNm(config.homeLat, config.homeLon, estPosAtT.lat, estPosAtT.lon);
+          const distKmAtT = distNmAtT * 1.852;
+          const bearingAtT = bearingDeg(config.homeLat, config.homeLon, estPosAtT.lat, estPosAtT.lon);
+          const uiAngleAtT = bearingToUiAngleDeg(bearingAtT, config.downBearingDeg, config.bearingToUiScale);
+          const r_unclampedAtT = (distKmAtT / lastPayload.maxDistanceKm) * 140;
+          const x_unclampedAtT = r_unclampedAtT * Math.cos(degToRad(uiAngleAtT));
+          const y_unclampedAtT = r_unclampedAtT * Math.sin(degToRad(uiAngleAtT));
+
+          trail.points.push({
+            x: x_unclampedAtT,
+            y: y_unclampedAtT,
+            t: tPoint,
+            isVerified: false
+          });
+        }
       }
-      state.lastPredPointTime = now;
+      state.lastPredPointTime = state.lastPredPointTime + numPoints * predInterval;
     }
 
     // Render secondary targets (if it is not the main selected flight)
@@ -591,6 +607,10 @@ function renderLoop() {
     const sDistKm = sDistNm * 1.852;
     const sBearing = bearingDeg(config.homeLat, config.homeLon, sEstPos.lat, sEstPos.lon);
     const sElevation = elevationAngleDeg(sDistNm, sEstPos.altitudeFt, config.homeElevationFt);
+    
+    // Compute 3D slant range (direct line-of-sight distance)
+    const sAltAboveHomeKm = Math.max(0, sEstPos.altitudeFt - config.homeElevationFt) * 0.0003048;
+    const sSlantRangeKm = Math.sqrt(sDistKm * sDistKm + sAltAboveHomeKm * sAltAboveHomeKm);
     const sUiAngle = bearingToUiAngleDeg(sBearing, config.downBearingDeg, config.bearingToUiScale);
 
     // Map to SVG coordinates
@@ -665,7 +685,7 @@ function renderLoop() {
       metricVerticalRateEl.textContent = "LEVEL";
     }
 
-    metricDistanceEl.textContent = sDistKm.toFixed(1);
+    metricDistanceEl.textContent = sSlantRangeKm.toFixed(1);
     metricElevationEl.textContent = `${getElevationDescription(sElevation)} (${Math.round(sElevation)}° up)`;
     metricSpeedEl.textContent = Math.round(activeSelected.groundSpeedKmh || 0);
     metricBearingEl.textContent = Math.round(sBearing);

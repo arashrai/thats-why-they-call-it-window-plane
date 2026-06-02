@@ -404,14 +404,32 @@ function validateAndLogAircraft(a) {
 }
 
 function isSelectableAircraft(a) {
+  if (a.lat == null || a.lon == null || a.distanceKm == null || a.elevationAngleDeg == null) {
+    return false;
+  }
+  const altitudeAboveHomeFt = (a.altitudeFt ?? HOME.elevationFt) - HOME.elevationFt;
+  const altitudeAboveHomeKm = altitudeAboveHomeFt * 0.0003048;
+  const slantRangeKm = Math.sqrt(a.distanceKm * a.distanceKm + altitudeAboveHomeKm * altitudeAboveHomeKm);
+
   return (
-    a.lat != null &&
-    a.lon != null &&
-    a.distanceKm != null &&
-    a.elevationAngleDeg != null &&
-    a.distanceKm <= HOME.maxDistanceKm &&
+    slantRangeKm <= HOME.maxDistanceKm &&
     a.elevationAngleDeg >= HOME.minElevationAngleDeg &&
     a.elevationAngleDeg <= HOME.maxElevationAngleDeg
+  );
+}
+
+function isStillSelectableAircraft(a) {
+  if (a.lat == null || a.lon == null || a.distanceKm == null || a.elevationAngleDeg == null) {
+    return false;
+  }
+  const altitudeAboveHomeFt = (a.altitudeFt ?? HOME.elevationFt) - HOME.elevationFt;
+  const altitudeAboveHomeKm = altitudeAboveHomeFt * 0.0003048;
+  const slantRangeKm = Math.sqrt(a.distanceKm * a.distanceKm + altitudeAboveHomeKm * altitudeAboveHomeKm);
+
+  return (
+    slantRangeKm <= (HOME.maxDistanceKm + 1.0) &&
+    a.elevationAngleDeg >= (HOME.minElevationAngleDeg - 2.0) &&
+    a.elevationAngleDeg <= (HOME.maxElevationAngleDeg + 2.0)
   );
 }
 
@@ -420,10 +438,10 @@ function enrichAircraft(a) {
   const lon = a.lon ?? null;
 
   const altitudeFt =
-    typeof a.alt_baro === "number"
-      ? a.alt_baro
-      : typeof a.alt_geom === "number"
-        ? a.alt_geom
+    typeof a.alt_geom === "number"
+      ? a.alt_geom
+      : typeof a.alt_baro === "number"
+        ? a.alt_baro
         : null;
 
   const hasHome =
@@ -530,7 +548,7 @@ app.get("/api/aircraft", async (req, res) => {
 
     if (bestSelectable) {
       const currentActive = clientSelectedHex ? aircraft.find((a) => a.hex === clientSelectedHex) : null;
-      if (currentActive && currentActive.isSelectable) {
+      if (currentActive && isStillSelectableAircraft(currentActive)) {
         const bestDistance = bestSelectable.distanceKm ?? Infinity;
         const currentDistance = currentActive.distanceKm ?? Infinity;
         // Hysteresis threshold: new target must be at least 0.3 km closer to trigger selection switch
@@ -541,6 +559,11 @@ app.get("/api/aircraft", async (req, res) => {
         }
       } else {
         selected = bestSelectable;
+      }
+    } else if (clientSelectedHex) {
+      const currentActive = aircraft.find((a) => a.hex === clientSelectedHex) || null;
+      if (currentActive && isStillSelectableAircraft(currentActive)) {
+        selected = currentActive;
       }
     }
 
