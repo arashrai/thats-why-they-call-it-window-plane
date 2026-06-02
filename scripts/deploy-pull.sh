@@ -4,6 +4,7 @@ set -euo pipefail
 cd /home/arash/projects/thats-why-they-call-it-window-plane
 
 git pull
+chmod +x scripts/*.sh
 npm install
 
 sudo systemctl restart windowplane
