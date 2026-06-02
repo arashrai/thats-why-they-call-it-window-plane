@@ -283,8 +283,6 @@ async function fetchAirspace() {
       
       // Update dynamic ring distance labels
       const maxDist = lastPayload.maxDistanceKm;
-      if (ringLabelInnerEl) ringLabelInnerEl.textContent = `${(maxDist * 40 / 140).toFixed(1)} km`;
-      if (ringLabelMidEl) ringLabelMidEl.textContent = `${(maxDist * 90 / 140).toFixed(1)} km`;
       if (ringLabelOuterEl) ringLabelOuterEl.textContent = `${maxDist.toFixed(1)} km`;
     }
     
@@ -323,10 +321,35 @@ function updatePlaneStates(allPlanes) {
         lastTrueTime: newTrueTime,
         lastTrackTime: newTrueTime,
         turnRateDegPerSec: 0,
-        hasNewVerifiedCoord: true,
         verifiedCoords: [{ lat: plane.lat, lon: plane.lon, t: newTrueTime }]
       };
       planeStates.set(plane.hex, state);
+
+      // Record first verified point directly to the trail
+      let trail = flightTrails.get(plane.hex);
+      if (!trail) {
+        trail = { points: [], maxAge: Infinity, active: true };
+        flightTrails.set(plane.hex, trail);
+      }
+      trail.active = true;
+      trail.maxAge = Infinity;
+
+      if (config && lastPayload) {
+        const rawDistNm = haversineNm(config.homeLat, config.homeLon, plane.lat, plane.lon);
+        const rawDistKm = rawDistNm * 1.852;
+        const rawBearing = bearingDeg(config.homeLat, config.homeLon, plane.lat, plane.lon);
+        const rawUiAngle = bearingToUiAngleDeg(rawBearing, config.downBearingDeg, config.bearingToUiScale);
+        const rawR = (rawDistKm / lastPayload.maxDistanceKm) * 132;
+        const rawX = rawR * Math.cos(degToRad(rawUiAngle));
+        const rawY = rawR * Math.sin(degToRad(rawUiAngle));
+
+        trail.points.push({
+          x: rawX,
+          y: rawY,
+          t: newTrueTime,
+          isVerified: true
+        });
+      }
     } else {
       // Update basic fields
       state.displayName = plane.displayName || state.displayName;
@@ -343,7 +366,6 @@ function updatePlaneStates(allPlanes) {
           state.lastTrueLat = plane.lat;
           state.lastTrueLon = plane.lon;
           state.lastTrueTime = newTrueTime;
-          state.hasNewVerifiedCoord = true;
           hasNewCoord = true;
           
           if (!state.verifiedCoords) {
@@ -352,6 +374,32 @@ function updatePlaneStates(allPlanes) {
           state.verifiedCoords.push({ lat: plane.lat, lon: plane.lon, t: newTrueTime });
           if (state.verifiedCoords.length > 5) {
             state.verifiedCoords.shift();
+          }
+
+          // Record verified point directly in the trail
+          let trail = flightTrails.get(plane.hex);
+          if (!trail) {
+            trail = { points: [], maxAge: Infinity, active: true };
+            flightTrails.set(plane.hex, trail);
+          }
+          trail.active = true;
+          trail.maxAge = Infinity;
+
+          if (config && lastPayload) {
+            const rawDistNm = haversineNm(config.homeLat, config.homeLon, plane.lat, plane.lon);
+            const rawDistKm = rawDistNm * 1.852;
+            const rawBearing = bearingDeg(config.homeLat, config.homeLon, plane.lat, plane.lon);
+            const rawUiAngle = bearingToUiAngleDeg(rawBearing, config.downBearingDeg, config.bearingToUiScale);
+            const rawR = (rawDistKm / lastPayload.maxDistanceKm) * 132;
+            const rawX = rawR * Math.cos(degToRad(rawUiAngle));
+            const rawY = rawR * Math.sin(degToRad(rawUiAngle));
+
+            trail.points.push({
+              x: rawX,
+              y: rawY,
+              t: newTrueTime,
+              isVerified: true
+            });
           }
         }
       }
@@ -480,12 +528,12 @@ function renderLoop() {
     const uiAngle = bearingToUiAngleDeg(bearing, config.downBearingDeg, config.bearingToUiScale);
 
     // Unclamped coordinates for trails (so they extend past the border smoothly)
-    const r_unclamped = (distKm / lastPayload.maxDistanceKm) * 140;
+    const r_unclamped = (distKm / lastPayload.maxDistanceKm) * 132;
     const x_unclamped = r_unclamped * Math.cos(degToRad(uiAngle));
     const y_unclamped = r_unclamped * Math.sin(degToRad(uiAngle));
 
     // Clamped coordinates for targets/dots on the radar grid
-    const r = Math.min(140, r_unclamped);
+    const r = Math.min(132, r_unclamped);
     const x = r * Math.cos(degToRad(uiAngle));
     const y = r * Math.sin(degToRad(uiAngle));
 
@@ -498,28 +546,9 @@ function renderLoop() {
     trail.active = true;
     trail.maxAge = Infinity;
 
-    // Check if we need to record a verified point
-    if (state.hasNewVerifiedCoord) {
-      const rawDistNm = haversineNm(config.homeLat, config.homeLon, state.lastTrueLat, state.lastTrueLon);
-      const rawDistKm = rawDistNm * 1.852;
-      const rawBearing = bearingDeg(config.homeLat, config.homeLon, state.lastTrueLat, state.lastTrueLon);
-      const rawUiAngle = bearingToUiAngleDeg(rawBearing, config.downBearingDeg, config.bearingToUiScale);
-      const rawR = (rawDistKm / lastPayload.maxDistanceKm) * 140;
-      const rawX = rawR * Math.cos(degToRad(rawUiAngle));
-      const rawY = rawR * Math.sin(degToRad(rawUiAngle));
-
-      trail.points.push({
-        x: rawX,
-        y: rawY,
-        t: state.lastTrueTime,
-        isVerified: true
-      });
-      state.hasNewVerifiedCoord = false;
-    }
-
     // Append periodic prediction points every 300ms
-    if (!state.lastPredPointTime) {
-      state.lastPredPointTime = now;
+    if (!state.lastPredPointTime || state.lastPredPointTime < state.lastTrueTime) {
+      state.lastPredPointTime = state.lastTrueTime;
     }
     const predInterval = 300;
     const elapsedPred = now - state.lastPredPointTime;
@@ -535,7 +564,7 @@ function renderLoop() {
           const distKmAtT = distNmAtT * 1.852;
           const bearingAtT = bearingDeg(config.homeLat, config.homeLon, estPosAtT.lat, estPosAtT.lon);
           const uiAngleAtT = bearingToUiAngleDeg(bearingAtT, config.downBearingDeg, config.bearingToUiScale);
-          const r_unclampedAtT = (distKmAtT / lastPayload.maxDistanceKm) * 140;
+          const r_unclampedAtT = (distKmAtT / lastPayload.maxDistanceKm) * 132;
           const x_unclampedAtT = r_unclampedAtT * Math.cos(degToRad(uiAngleAtT));
           const y_unclampedAtT = r_unclampedAtT * Math.sin(degToRad(uiAngleAtT));
 
@@ -636,7 +665,7 @@ function renderLoop() {
     const sUiAngle = bearingToUiAngleDeg(sBearing, config.downBearingDeg, config.bearingToUiScale);
 
     // Map to SVG coordinates
-    const sR = Math.min(140, (sDistKm / lastPayload.maxDistanceKm) * 140);
+    const sR = Math.min(132, (sDistKm / lastPayload.maxDistanceKm) * 132);
     const sTargetX = sR * Math.cos(degToRad(sUiAngle));
     const sTargetY = sR * Math.sin(degToRad(sUiAngle));
 
@@ -676,7 +705,9 @@ function renderLoop() {
     arrowBearingLabelEl.textContent = `${Math.round(sBearing).toString().padStart(3, "0")}°`;
 
     // Update Text Dashboard
-    airlineNameEl.textContent = activeSelected.route?.airline || (activeSelected.displayName.startsWith("a") ? "AIRCRAFT" : "COMMERCIAL FLIGHT");
+    if (airlineNameEl) {
+      airlineNameEl.textContent = activeSelected.route?.airline || (activeSelected.displayName.startsWith("a") ? "AIRCRAFT" : "COMMERCIAL FLIGHT");
+    }
     flightCallsignEl.textContent = activeSelected.displayName;
     aircraftTypeEl.textContent = activeSelected.aircraftType || "Aircraft type unknown";
 
