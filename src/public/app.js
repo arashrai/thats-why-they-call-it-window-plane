@@ -6,7 +6,8 @@ import {
   haversineNm,
   bearingDeg,
   elevationAngleDeg,
-  bearingToUiAngleDeg,
+  calculatePerspectiveCoords,
+  calculatePerspectiveArrowAngle,
   getCardinalDirection,
   getElevationDescription,
   degToRad,
@@ -112,17 +113,24 @@ function renderLoop() {
     const distNm = haversineNm(config.homeLat, config.homeLon, estPos.lat, estPos.lon);
     const distKm = distNm * 1.852;
     const bearing = bearingDeg(config.homeLat, config.homeLon, estPos.lat, estPos.lon);
-    const uiAngle = bearingToUiAngleDeg(bearing, config.downBearingDeg, config.bearingToUiScale, config.projectorTiltDeg);
+    const elevation = elevationAngleDeg(distNm, estPos.altitudeFt, config.homeElevationFt);
+
+    const uiAngle = calculatePerspectiveArrowAngle(bearing, config);
+    const pCoords = calculatePerspectiveCoords(bearing, elevation, config);
 
     // Unclamped coordinates for trails (so they extend past the border smoothly)
-    const r_unclamped = (distKm / lastPayload.maxDistanceKm) * 132;
-    const x_unclamped = r_unclamped * Math.cos(degToRad(uiAngle));
-    const y_unclamped = r_unclamped * Math.sin(degToRad(uiAngle));
+    const x_unclamped = pCoords.x;
+    const y_unclamped = pCoords.y;
 
     // Clamped coordinates for targets/dots on the radar grid
+    const r_unclamped = Math.sqrt(x_unclamped * x_unclamped + y_unclamped * y_unclamped);
     const r = Math.min(132, r_unclamped);
-    const x = r * Math.cos(degToRad(uiAngle));
-    const y = r * Math.sin(degToRad(uiAngle));
+    let x = x_unclamped;
+    let y = y_unclamped;
+    if (r_unclamped > 132) {
+      x = (x_unclamped / r_unclamped) * 132;
+      y = (y_unclamped / r_unclamped) * 132;
+    }
 
     // Update coordinates in the state for renderer
     state.x = x;

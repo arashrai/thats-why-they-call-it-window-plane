@@ -2,7 +2,8 @@ import {
   lerp,
   haversineNm,
   bearingDeg,
-  bearingToUiAngleDeg,
+  elevationAngleDeg,
+  calculatePerspectiveCoords,
   degToRad,
   estimatePositionFromState,
   calculateKinematicsFromCoords
@@ -59,16 +60,13 @@ export class StateManager {
 
         if (config && maxDistanceKm) {
           const rawDistNm = haversineNm(config.homeLat, config.homeLon, plane.lat, plane.lon);
-          const rawDistKm = rawDistNm * 1.852;
           const rawBearing = bearingDeg(config.homeLat, config.homeLon, plane.lat, plane.lon);
-          const rawUiAngle = bearingToUiAngleDeg(rawBearing, config.downBearingDeg, config.bearingToUiScale, config.projectorTiltDeg);
-          const rawR = (rawDistKm / maxDistanceKm) * 132;
-          const rawX = rawR * Math.cos(degToRad(rawUiAngle));
-          const rawY = rawR * Math.sin(degToRad(rawUiAngle));
+          const rawElev = elevationAngleDeg(rawDistNm, plane.altitudeFt, config.homeElevationFt);
+          const rawCoords = calculatePerspectiveCoords(rawBearing, rawElev, config);
 
           trail.points.push({
-            x: rawX,
-            y: rawY,
+            x: rawCoords.x,
+            y: rawCoords.y,
             t: newTrueTime,
             isVerified: true
           });
@@ -107,16 +105,13 @@ export class StateManager {
 
             if (config && maxDistanceKm) {
               const rawDistNm = haversineNm(config.homeLat, config.homeLon, plane.lat, plane.lon);
-              const rawDistKm = rawDistNm * 1.852;
               const rawBearing = bearingDeg(config.homeLat, config.homeLon, plane.lat, plane.lon);
-              const rawUiAngle = bearingToUiAngleDeg(rawBearing, config.downBearingDeg, config.bearingToUiScale, config.projectorTiltDeg);
-              const rawR = (rawDistKm / maxDistanceKm) * 132;
-              const rawX = rawR * Math.cos(degToRad(rawUiAngle));
-              const rawY = rawR * Math.sin(degToRad(rawUiAngle));
+              const rawElev = elevationAngleDeg(rawDistNm, plane.altitudeFt, config.homeElevationFt);
+              const rawCoords = calculatePerspectiveCoords(rawBearing, rawElev, config);
 
               trail.points.push({
-                x: rawX,
-                y: rawY,
+                x: rawCoords.x,
+                y: rawCoords.y,
                 t: newTrueTime,
                 isVerified: true
               });
@@ -230,16 +225,13 @@ export class StateManager {
           
           if (estPosAtT && config && maxDistanceKm) {
             const distNmAtT = haversineNm(config.homeLat, config.homeLon, estPosAtT.lat, estPosAtT.lon);
-            const distKmAtT = distNmAtT * 1.852;
             const bearingAtT = bearingDeg(config.homeLat, config.homeLon, estPosAtT.lat, estPosAtT.lon);
-            const uiAngleAtT = bearingToUiAngleDeg(bearingAtT, config.downBearingDeg, config.bearingToUiScale, config.projectorTiltDeg);
-            const r_unclampedAtT = (distKmAtT / maxDistanceKm) * 132;
-            const x_unclampedAtT = r_unclampedAtT * Math.cos(degToRad(uiAngleAtT));
-            const y_unclampedAtT = r_unclampedAtT * Math.sin(degToRad(uiAngleAtT));
+            const elevAtT = elevationAngleDeg(distNmAtT, estPosAtT.altitudeFt, config.homeElevationFt);
+            const coordsAtT = calculatePerspectiveCoords(bearingAtT, elevAtT, config);
 
             trail.points.push({
-              x: x_unclampedAtT,
-              y: y_unclampedAtT,
+              x: coordsAtT.x,
+              y: coordsAtT.y,
               t: tPoint,
               isVerified: false
             });

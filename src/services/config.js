@@ -10,7 +10,9 @@ const HOME = {
   maxDistanceKm: Number(process.env.MAX_DISTANCE_KM || 10),
   downBearingDeg: Number(process.env.DOWN_BEARING_DEG || 120),
   bearingToUiScale: Number(process.env.BEARING_TO_UI_SCALE || 1),
-  projectorTiltDeg: Number(process.env.PROJECTOR_TILT_DEG || 0)
+  projectorTiltDeg: Number(process.env.PROJECTOR_TILT_DEG || 0),
+  ceilingHeightFt: Number(process.env.CEILING_HEIGHT_FT || 8.0),
+  radarRadiusFt: Number(process.env.RADAR_RADIUS_FT || 2.0)
 };
 
 if (isNaN(HOME.lat) || isNaN(HOME.lon)) {
@@ -20,7 +22,7 @@ if (isNaN(HOME.lat) || isNaN(HOME.lon)) {
 }
 
 console.log(`[Config] Selection range: MaxDistance=${HOME.maxDistanceKm}km`);
-console.log(`[Config] Projection calibration: DownBearing=${HOME.downBearingDeg}°, ScaleMultiplier=${HOME.bearingToUiScale}, ProjectorTilt=${HOME.projectorTiltDeg}°`);
+console.log(`[Config] Projection calibration: DownBearing=${HOME.downBearingDeg}°, ProjectorTilt=${HOME.projectorTiltDeg}°, CeilingHeight=${HOME.ceilingHeightFt}ft, RadarRadius=${HOME.radarRadiusFt}ft`);
 
 export const config = {
   port: PORT,

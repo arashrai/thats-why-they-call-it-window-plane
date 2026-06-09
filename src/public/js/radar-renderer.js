@@ -1,3 +1,5 @@
+import { calculatePerspectiveArrowAngle } from "./math.js";
+
 export class RadarRenderer {
   constructor() {
     this.compassGroupEl = document.getElementById("compass-group");
@@ -11,8 +13,33 @@ export class RadarRenderer {
 
   setCompassRotation(config) {
     if (!config) return;
-    const compassRotationOffset = 180 + config.downBearingDeg;
-    this.compassGroupEl.style.transform = `rotate(${compassRotationOffset}deg)`;
+    
+    // Reset compass group rotation since we now position individual text nodes
+    this.compassGroupEl.style.transform = "none";
+    
+    // Position each cardinal direction text element individually in perspective
+    const bearings = {
+      north: 0,
+      east: 90,
+      south: 180,
+      west: 270
+    };
+    
+    const r = 143; // radius for compass labels
+    
+    for (const [key, b] of Object.entries(bearings)) {
+      const angleDeg = calculatePerspectiveArrowAngle(b, config);
+      const angleRad = (angleDeg * Math.PI) / 180;
+      
+      const x = r * Math.cos(angleRad);
+      const y = r * Math.sin(angleRad);
+      
+      const el = this.compassGroupEl.querySelector(`.${key}`);
+      if (el) {
+        el.setAttribute("x", x.toFixed(1));
+        el.setAttribute("y", y.toFixed(1));
+      }
+    }
   }
 
   renderTrails(flightTrails, now) {

@@ -106,8 +106,6 @@ body {
 /* Rotatable Compass */
 .compass-group {
   transform-origin: 0 0;
-  transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);
-  will-change: transform;
 }
 
 .compass-label {
