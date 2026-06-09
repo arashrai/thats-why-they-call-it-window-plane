@@ -11,7 +11,7 @@ export class RadarRenderer {
 
   setCompassRotation(config) {
     if (!config) return;
-    const compassRotationOffset = 180 + config.downBearingDeg * config.bearingToUiScale;
+    const compassRotationOffset = 180 + config.downBearingDeg;
     this.compassGroupEl.style.transform = `rotate(${compassRotationOffset}deg)`;
   }
 
