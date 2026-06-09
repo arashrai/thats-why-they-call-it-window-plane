@@ -42,7 +42,8 @@ app.get("/api/aircraft", async (req, res) => {
         homeLon: config.home.lon,
         homeElevationFt: config.home.elevationFt,
         downBearingDeg: config.home.downBearingDeg,
-        bearingToUiScale: config.home.bearingToUiScale
+        bearingToUiScale: config.home.bearingToUiScale,
+        projectorTiltDeg: config.home.projectorTiltDeg
       }
     });
   } catch (err) {

@@ -112,7 +112,7 @@ function renderLoop() {
     const distNm = haversineNm(config.homeLat, config.homeLon, estPos.lat, estPos.lon);
     const distKm = distNm * 1.852;
     const bearing = bearingDeg(config.homeLat, config.homeLon, estPos.lat, estPos.lon);
-    const uiAngle = bearingToUiAngleDeg(bearing, config.downBearingDeg, config.bearingToUiScale);
+    const uiAngle = bearingToUiAngleDeg(bearing, config.downBearingDeg, config.bearingToUiScale, config.projectorTiltDeg);
 
     // Unclamped coordinates for trails (so they extend past the border smoothly)
     const r_unclamped = (distKm / lastPayload.maxDistanceKm) * 132;

@@ -61,7 +61,7 @@ export class StateManager {
           const rawDistNm = haversineNm(config.homeLat, config.homeLon, plane.lat, plane.lon);
           const rawDistKm = rawDistNm * 1.852;
           const rawBearing = bearingDeg(config.homeLat, config.homeLon, plane.lat, plane.lon);
-          const rawUiAngle = bearingToUiAngleDeg(rawBearing, config.downBearingDeg, config.bearingToUiScale);
+          const rawUiAngle = bearingToUiAngleDeg(rawBearing, config.downBearingDeg, config.bearingToUiScale, config.projectorTiltDeg);
           const rawR = (rawDistKm / maxDistanceKm) * 132;
           const rawX = rawR * Math.cos(degToRad(rawUiAngle));
           const rawY = rawR * Math.sin(degToRad(rawUiAngle));
@@ -109,7 +109,7 @@ export class StateManager {
               const rawDistNm = haversineNm(config.homeLat, config.homeLon, plane.lat, plane.lon);
               const rawDistKm = rawDistNm * 1.852;
               const rawBearing = bearingDeg(config.homeLat, config.homeLon, plane.lat, plane.lon);
-              const rawUiAngle = bearingToUiAngleDeg(rawBearing, config.downBearingDeg, config.bearingToUiScale);
+              const rawUiAngle = bearingToUiAngleDeg(rawBearing, config.downBearingDeg, config.bearingToUiScale, config.projectorTiltDeg);
               const rawR = (rawDistKm / maxDistanceKm) * 132;
               const rawX = rawR * Math.cos(degToRad(rawUiAngle));
               const rawY = rawR * Math.sin(degToRad(rawUiAngle));
@@ -232,7 +232,7 @@ export class StateManager {
             const distNmAtT = haversineNm(config.homeLat, config.homeLon, estPosAtT.lat, estPosAtT.lon);
             const distKmAtT = distNmAtT * 1.852;
             const bearingAtT = bearingDeg(config.homeLat, config.homeLon, estPosAtT.lat, estPosAtT.lon);
-            const uiAngleAtT = bearingToUiAngleDeg(bearingAtT, config.downBearingDeg, config.bearingToUiScale);
+            const uiAngleAtT = bearingToUiAngleDeg(bearingAtT, config.downBearingDeg, config.bearingToUiScale, config.projectorTiltDeg);
             const r_unclampedAtT = (distKmAtT / maxDistanceKm) * 132;
             const x_unclampedAtT = r_unclampedAtT * Math.cos(degToRad(uiAngleAtT));
             const y_unclampedAtT = r_unclampedAtT * Math.sin(degToRad(uiAngleAtT));

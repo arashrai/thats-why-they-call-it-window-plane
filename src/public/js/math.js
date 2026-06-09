@@ -38,10 +38,19 @@ export function elevationAngleDeg(distanceNm, altitudeFt, homeElevationFt) {
   return radToDeg(Math.atan2(altitudeAboveHomeFt, groundDistanceFt));
 }
 
-export function bearingToUiAngleDeg(bearingFromHomeDeg, downBearingDeg, bearingToUiScale) {
+export function bearingToUiAngleDeg(bearingFromHomeDeg, downBearingDeg, bearingToUiScale, projectorTiltDeg = 0) {
   if (bearingFromHomeDeg == null) return 90;
   const diffFromDown = signedAngularDiffDeg(bearingFromHomeDeg, downBearingDeg);
-  return normalizeDeg(90 - diffFromDown * bearingToUiScale);
+  let correctedDiff = diffFromDown;
+
+  if (projectorTiltDeg > 0 && projectorTiltDeg < 90) {
+    const tiltRad = (projectorTiltDeg * Math.PI) / 180;
+    const diffRad = (diffFromDown * Math.PI) / 180;
+    const correctedRad = Math.atan2(Math.sin(diffRad), Math.cos(diffRad) * Math.cos(tiltRad));
+    correctedDiff = (correctedRad * 180) / Math.PI;
+  }
+
+  return normalizeDeg(90 - correctedDiff * bearingToUiScale);
 }
 
 export function getCardinalDirection(bearing) {

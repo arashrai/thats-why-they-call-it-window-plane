@@ -169,7 +169,17 @@ function validateAndLogAircraft(a) {
 function bearingToUiAngleDeg(bearingFromHomeDeg) {
   if (bearingFromHomeDeg == null) return 90;
   const diffFromDown = signedAngularDiffDeg(bearingFromHomeDeg, config.home.downBearingDeg);
-  return normalizeDeg(90 - diffFromDown * config.home.bearingToUiScale);
+  let correctedDiff = diffFromDown;
+
+  const tilt = config.home.projectorTiltDeg || 0;
+  if (tilt > 0 && tilt < 90) {
+    const tiltRad = (tilt * Math.PI) / 180;
+    const diffRad = (diffFromDown * Math.PI) / 180;
+    const correctedRad = Math.atan2(Math.sin(diffRad), Math.cos(diffRad) * Math.cos(tiltRad));
+    correctedDiff = (correctedRad * 180) / Math.PI;
+  }
+
+  return normalizeDeg(90 - correctedDiff * config.home.bearingToUiScale);
 }
 
 function enrichAircraft(a) {
