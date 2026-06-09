@@ -175,7 +175,7 @@ export class StateManager {
         this.displaySelectedHex = null;
       } else if (activeState) {
         const ageSec = (Date.now() - activeState.lastTrueTime) / 1000;
-        if (ageSec > 15.0) {
+        if (ageSec > 30.0) {
           this.displaySelectedHex = null;
         }
       } else {

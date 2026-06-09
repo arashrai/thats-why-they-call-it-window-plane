@@ -282,9 +282,9 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  gap: 20px;
+  gap: 36px;
   height: 100vh;
-  padding: 24px 28px;
+  padding: 32px 36px;
   border-left: 1px solid var(--border-color);
   overflow-y: auto;
   background-color: var(--bg-color);
@@ -300,7 +300,7 @@ body {
 .flight-data {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 24px;
   width: 100%;
 }
 
@@ -316,7 +316,7 @@ body {
  
 .flight-callsign {
   font-family: var(--font-hud);
-  font-size: clamp(48px, 6vw, 76px);
+  font-size: clamp(56px, 7vw, 84px);
   line-height: 1.1;
   font-weight: 900;
   color: #ffffff;
@@ -327,111 +327,111 @@ body {
 }
  
 .aircraft-type {
-  font-size: clamp(18px, 2.2vw, 24px);
+  font-size: clamp(22px, 2.5vw, 28px);
   font-weight: 700;
-  color: #ffffff;
+  color: rgba(255, 255, 255, 0.7);
   line-height: 1.2;
 }
 
 /* Route Display (SFO -> SEA) */
 .route-display {
-  background-color: var(--panel-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 8px 14px;
+  background-color: transparent;
+  border: none;
+  padding: 4px 0;
   overflow: hidden;
 }
 
 .route-airports {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 20px;
 }
 
 .airport-block {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
 }
 
 .airport-code {
   font-family: var(--font-hud);
-  font-size: clamp(32px, 4.5vw, 48px);
+  font-size: clamp(40px, 5.5vw, 56px);
   font-weight: 900;
   line-height: 1.1;
 }
 
 .airport-name {
-  font-size: 14px;
-  color: #ffffff;
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.7);
   margin-top: 1px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 160px;
+  max-width: 220px;
 }
 
 .route-connector {
-  font-size: 32px;
+  font-size: 44px;
   color: var(--accent-cyan);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 15px;
-  flex-grow: 1;
+  padding: 0 5px;
 }
 
 /* Metrics Grid (Locked Sizes) */
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: 16px;
   width: 100%;
 }
  
 .metric-box {
-  background-color: var(--panel-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 12px 14px;
+  background-color: transparent;
+  border: none;
+  padding: 4px 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: flex-start;
-  height: 100px;
+  height: auto;
   box-sizing: border-box;
-  overflow: hidden;
-  gap: 6px;
+  overflow: visible;
+  gap: 4px;
 }
  
 .metric-box.highlighted {
-  border-color: var(--accent-amber);
+  border: none;
 }
  
 .metric-label {
   font-family: var(--font-hud);
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 800;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.75);
   letter-spacing: 0.05em;
-  margin-right: 4px;
+  margin-right: 6px;
 }
 
 .metric-box.highlighted .metric-label {
-  color: rgba(255, 183, 3, 0.65);
+  color: var(--accent-amber);
+  opacity: 0.85;
 }
  
 .metric-main-row {
   display: flex;
   align-items: baseline;
-  gap: 4px;
+  gap: 6px;
   white-space: nowrap;
-  overflow: hidden;
+  overflow: visible;
   width: 100%;
 }
  
 .metric-value {
   font-family: var(--font-hud);
-  font-size: clamp(30px, 4.2vw, 38px);
+  font-size: clamp(38px, 5vw, 52px);
   font-weight: 900;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -443,21 +443,22 @@ body {
 }
  
 .metric-unit {
-  font-size: 16px;
+  font-size: 22px;
   font-weight: 800;
-  color: rgba(255, 255, 255, 0.5);
-  margin-left: 2px;
+  color: rgba(255, 255, 255, 0.75);
+  margin-left: 4px;
 }
 
 .metric-box.highlighted .metric-unit {
-  color: rgba(255, 183, 3, 0.6);
+  color: var(--accent-amber);
+  opacity: 0.85;
 }
 
 .metric-unit.degree-symbol {
-  font-size: 26px;
+  font-size: 38px;
   line-height: 1;
   margin-left: -2px;
-  color: rgba(255, 255, 255, 0.65);
+  color: rgba(255, 255, 255, 0.8);
   align-self: flex-start;
   margin-top: 1px;
 }
@@ -465,14 +466,15 @@ body {
 .metric-sub-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   width: 100%;
+  margin-top: 2px;
 }
  
 .metric-subtext {
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.9);
   text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
@@ -480,11 +482,11 @@ body {
 }
 
 .metric-box.highlighted .metric-subtext {
-  color: rgba(255, 183, 3, 0.85);
+  color: var(--accent-amber);
 }
  
 .trend-icon {
-  font-size: 14px;
+  font-size: 18px;
   color: #10b981;
   align-self: center;
 }
@@ -501,26 +503,25 @@ body {
 .no-flight-card {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 40px 30px;
-  border: 1px dashed var(--border-color);
-  border-radius: 8px;
-  background-color: var(--panel-bg);
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
+  padding: 8px 0;
+  background-color: transparent;
+  border: none;
   width: 100%;
 }
 
 .no-flight-card h2 {
   font-family: var(--font-hud);
-  font-size: 32px;
+  font-size: 38px;
   color: #ffffff;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .no-flight-card p {
-  font-size: 22px;
-  color: #ffffff;
+  font-size: 24px;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 /* Sonar wave pulse animation removed for minimalism */
@@ -529,15 +530,15 @@ body {
 .nearby-panel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  border-top: 1px solid var(--border-color);
-  padding-top: 15px;
+  gap: 12px;
+  border-top: none;
+  padding-top: 0;
 }
 
 .panel-subtitle {
   font-family: var(--font-hud);
-  font-size: 18px;
-  color: #ffffff;
+  font-size: 22px;
+  color: rgba(255, 255, 255, 0.7);
   font-weight: 800;
   letter-spacing: 0.05em;
 }
@@ -567,57 +568,56 @@ body {
 
 .nearby-row {
   display: grid;
-  grid-template-columns: 140px 120px 1fr;
+  grid-template-columns: 160px 140px 1fr;
   align-items: center;
-  background-color: var(--panel-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 12px 16px;
+  background-color: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 8px 0;
   max-width: 520px;
   gap: 12px;
 }
-
+ 
 .nearby-callsign {
   font-weight: 900;
   font-family: var(--font-hud);
   color: #ffffff;
-  font-size: 22px;
+  font-size: 24px;
 }
-
+ 
 .nearby-route {
-  color: #ffffff;
-  font-size: 18px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 20px;
   text-align: left;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
+ 
 .nearby-dist-alt {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  font-size: 15px;
+  font-size: 16px;
 }
-
+ 
 .nearby-dist {
   font-weight: 800;
   color: var(--accent-amber);
-  font-size: 18px;
+  font-size: 20px;
 }
-
+ 
 .nearby-alt {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 15px;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 16px;
 }
-
+ 
 .nearby-empty {
   font-size: 22px;
-  color: #ffffff;
-  text-align: center;
-  padding: 18px 0;
-  border: 1px dashed rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: left;
+  padding: 8px 0;
+  border: none;
 }
 
 /* System Disconnected overlay */

@@ -88,8 +88,8 @@ function renderLoop() {
   for (const [hex, state] of stateManager.planeStates.entries()) {
     const ageSinceLastTrue = now - state.lastTrueTime;
 
-    // Prune selections locally if grace period expired
-    if (displaySelectedHex && hex === displaySelectedHex && ageSinceLastTrue > 15000) {
+    // Prune selections locally if grace period expired (30 seconds to match radar state lifetime)
+    if (displaySelectedHex && hex === displaySelectedHex && ageSinceLastTrue > 30000) {
       stateManager.displaySelectedHex = null;
       stateManager.currentSelectedHex = null;
       continue;
