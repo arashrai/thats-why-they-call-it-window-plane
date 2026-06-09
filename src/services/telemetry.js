@@ -168,25 +168,18 @@ function validateAndLogAircraft(a) {
 
 function bearingToUiAngleDeg(bearingFromHomeDeg) {
   if (bearingFromHomeDeg == null) return 90;
-  
-  const Bd = config.home.downBearingDeg ?? 120;
-  const B = bearingFromHomeDeg;
-  
-  const ceilingHeight = config.home.ceilingHeightFt ?? 8.0;
-  const radarRadius = config.home.radarRadiusFt ?? 2.0;
-  const tilt = degToRad(config.home.projectorTiltDeg ?? 0);
-  
-  const K_scale = ceilingHeight / radarRadius;
-  const K_tilt = K_scale * Math.tan(tilt);
-  
-  const diffRad = degToRad(B - Bd);
-  const arg = K_tilt * Math.sin(diffRad);
-  const clampedArg = Math.max(-1.0, Math.min(1.0, arg));
-  
-  const acosValDeg = radToDeg(Math.acos(clampedArg));
-  
-  const angle = Bd - B + acosValDeg;
-  return normalizeDeg(angle);
+  const diffFromDown = signedAngularDiffDeg(bearingFromHomeDeg, config.home.downBearingDeg);
+  let correctedDiff = diffFromDown;
+
+  const tilt = config.home.projectorTiltDeg || 0;
+  if (tilt > 0 && tilt < 90) {
+    const tiltRad = (tilt * Math.PI) / 180;
+    const diffRad = (diffFromDown * Math.PI) / 180;
+    const correctedRad = Math.atan2(Math.sin(diffRad), Math.cos(diffRad) * Math.cos(tiltRad));
+    correctedDiff = (correctedRad * 180) / Math.PI;
+  }
+
+  return normalizeDeg(90 - correctedDiff * config.home.bearingToUiScale);
 }
 
 function enrichAircraft(a) {

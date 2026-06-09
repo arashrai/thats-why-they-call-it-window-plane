@@ -1,4 +1,4 @@
-import { calculatePerspectiveArrowAngle } from "./math.js";
+import { bearingToUiAngleDeg } from "./math.js";
 
 export class RadarRenderer {
   constructor() {
@@ -17,7 +17,7 @@ export class RadarRenderer {
     // Reset compass group rotation since we now position individual text nodes
     this.compassGroupEl.style.transform = "none";
     
-    // Position each cardinal direction text element individually in perspective
+    // Position each cardinal direction text element individually using bearingToUiAngleDeg
     const bearings = {
       north: 0,
       east: 90,
@@ -28,7 +28,7 @@ export class RadarRenderer {
     const r = 143; // radius for compass labels
     
     for (const [key, b] of Object.entries(bearings)) {
-      const angleDeg = calculatePerspectiveArrowAngle(b, config);
+      const angleDeg = bearingToUiAngleDeg(b, config.downBearingDeg, config.bearingToUiScale, config.projectorTiltDeg);
       const angleRad = (angleDeg * Math.PI) / 180;
       
       const x = r * Math.cos(angleRad);

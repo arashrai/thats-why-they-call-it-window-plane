@@ -38,60 +38,19 @@ export function elevationAngleDeg(distanceNm, altitudeFt, homeElevationFt) {
   return radToDeg(Math.atan2(altitudeAboveHomeFt, groundDistanceFt));
 }
 
-export function calculatePerspectiveCoords(bearing, elevation, config) {
-  if (bearing == null || elevation == null || !config) return { x: 0, y: 0 };
-  
-  const B = degToRad(bearing);
-  const Bd = degToRad(config.downBearingDeg ?? 120);
-  const E = degToRad(elevation);
-  
-  const ceilingHeight = config.ceilingHeightFt ?? 8.0;
-  const radarRadius = config.radarRadiusFt ?? 2.0;
-  const tilt = degToRad(config.projectorTiltDeg ?? 0);
-  
-  const K_scale = ceilingHeight / radarRadius;
-  const K_tilt = K_scale * Math.tan(tilt);
-  
-  const cotE = elevation > 0.1 ? 1.0 / Math.tan(E) : 9999.0;
-  const diff = B - Bd;
-  
-  const x = 132 * K_scale * cotE * Math.sin(diff);
-  const y = 132 * (K_scale * cotE * Math.cos(diff) - K_tilt);
-  
-  return { x, y };
-}
-
-export function calculatePerspectiveArrowAngle(bearing, config) {
-  if (bearing == null || !config) return 90;
-  
-  const Bd = config.downBearingDeg ?? 120;
-  const B = bearing;
-  
-  const ceilingHeight = config.ceilingHeightFt ?? 8.0;
-  const radarRadius = config.radarRadiusFt ?? 2.0;
-  const tilt = degToRad(config.projectorTiltDeg ?? 0);
-  
-  const K_scale = ceilingHeight / radarRadius;
-  const K_tilt = K_scale * Math.tan(tilt);
-  
-  const diffRad = degToRad(B - Bd);
-  const arg = K_tilt * Math.sin(diffRad);
-  const clampedArg = Math.max(-1.0, Math.min(1.0, arg));
-  
-  const acosValDeg = radToDeg(Math.acos(clampedArg));
-  
-  const angle = Bd - B + acosValDeg;
-  return normalizeDeg(angle);
-}
-
 export function bearingToUiAngleDeg(bearingFromHomeDeg, downBearingDeg, bearingToUiScale, projectorTiltDeg = 0) {
-  const mockConfig = {
-    downBearingDeg,
-    projectorTiltDeg,
-    ceilingHeightFt: 8.0,
-    radarRadiusFt: 2.0
-  };
-  return calculatePerspectiveArrowAngle(bearingFromHomeDeg, mockConfig);
+  if (bearingFromHomeDeg == null) return 90;
+  const diffFromDown = signedAngularDiffDeg(bearingFromHomeDeg, downBearingDeg);
+  let correctedDiff = diffFromDown;
+
+  if (projectorTiltDeg > 0 && projectorTiltDeg < 90) {
+    const tiltRad = (projectorTiltDeg * Math.PI) / 180;
+    const diffRad = (diffFromDown * Math.PI) / 180;
+    const correctedRad = Math.atan2(Math.sin(diffRad), Math.cos(diffRad) * Math.cos(tiltRad));
+    correctedDiff = (correctedRad * 180) / Math.PI;
+  }
+
+  return normalizeDeg(90 - correctedDiff * bearingToUiScale);
 }
 
 export function getCardinalDirection(bearing) {
