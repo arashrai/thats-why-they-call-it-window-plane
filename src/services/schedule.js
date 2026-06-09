@@ -165,7 +165,33 @@ export function getRouteForCallsign(callsign) {
   if (!callsign) return null;
 
   const cleanCallsign = callsign.trim().toUpperCase().replace(/\s+/g, "");
-  const entries = routeDatabase[cleanCallsign];
+  let entries = routeDatabase[cleanCallsign];
+
+  if (!entries || entries.length === 0) {
+    // Attempt to resolve alphanumeric ATC callsign suffixes (e.g., ICE11P -> ICE11, SWA45C -> SWA45)
+    const match = cleanCallsign.match(/^([A-Z]{2,3})(\d+)([A-Z]+)$/);
+    if (match) {
+      const prefix = match[1];
+      const num = match[2];
+      const strippedCallsign = `${prefix}${num}`;
+      entries = routeDatabase[strippedCallsign];
+
+      // If still not found, try translating IATA <=> ICAO
+      if (!entries || entries.length === 0) {
+        if (prefix.length === 3) {
+          const iata = Object.keys(IATA_TO_ICAO).find(key => IATA_TO_ICAO[key] === prefix);
+          if (iata) {
+            entries = routeDatabase[`${iata}${num}`];
+          }
+        } else if (prefix.length === 2) {
+          const icao = IATA_TO_ICAO[prefix];
+          if (icao) {
+            entries = routeDatabase[`${icao}${num}`];
+          }
+        }
+      }
+    }
+  }
 
   if (!entries || entries.length === 0) {
     if (!loggedMissingCallsigns.has(cleanCallsign)) {
