@@ -5,10 +5,11 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CURRENT_USER="$(whoami)"
 USER_HOME="$HOME"
+USER_UID="$(id -u "$CURRENT_USER")"
 
 echo "Installing systemd services..."
 echo "Repository Directory: $REPO_DIR"
-echo "Target User: $CURRENT_USER"
+echo "Target User: $CURRENT_USER (UID: $USER_UID)"
 echo "User Home: $USER_HOME"
 
 # Create temp files with replacements
@@ -21,6 +22,8 @@ sed -e "s|User=arash|User=$CURRENT_USER|g" \
     "$REPO_DIR/systemd/windowplane.service" > "$TEMP_WP"
 
 sed -e "s|User=arash|User=$CURRENT_USER|g" \
+    -e "s|arash:arash|$CURRENT_USER:$CURRENT_USER|g" \
+    -e "s|/run/user/1000|/run/user/$USER_UID|g" \
     -e "s|/home/arash/projects/thats-why-they-call-it-window-plane|$REPO_DIR|g" \
     -e "s|HOME=/home/arash|HOME=$USER_HOME|g" \
     "$REPO_DIR/systemd/windowplane-kiosk.service" > "$TEMP_KIOSK"
