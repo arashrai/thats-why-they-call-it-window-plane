@@ -7,14 +7,13 @@ Conflicts=getty@tty7.service
 [Service]
 Type=simple
 User=arash
-SupplementaryGroups=video render input tty seat
+SupplementaryGroups=video render input tty
 WorkingDirectory=/home/arash/projects/thats-why-they-call-it-window-plane
 Environment=HOME=/home/arash
 Environment=XDG_RUNTIME_DIR=/run/user/1000
 ExecStartPre=+/bin/mkdir -p /run/user/1000
-ExecStartPre=+/bin/chown arash:arash /run/user/1000
-ExecStartPre=+/bin/chmod 0700 /run/user/1000
-ExecStartPre=+/bin/chvt 7
+ExecStartPre=+/bin/chown arash /run/user/1000
+ExecStartPre=-/bin/chvt 7
 ExecStart=/home/arash/projects/thats-why-they-call-it-window-plane/scripts/start-kiosk.sh
 Restart=always
 RestartSec=5

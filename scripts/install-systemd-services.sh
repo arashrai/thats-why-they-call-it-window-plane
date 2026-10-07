@@ -22,7 +22,7 @@ sed -e "s|User=arash|User=$CURRENT_USER|g" \
     "$REPO_DIR/systemd/windowplane.service" > "$TEMP_WP"
 
 sed -e "s|User=arash|User=$CURRENT_USER|g" \
-    -e "s|arash:arash|$CURRENT_USER:$CURRENT_USER|g" \
+    -e "s|chown arash|chown $CURRENT_USER|g" \
     -e "s|/run/user/1000|/run/user/$USER_UID|g" \
     -e "s|/home/arash/projects/thats-why-they-call-it-window-plane|$REPO_DIR|g" \
     -e "s|HOME=/home/arash|HOME=$USER_HOME|g" \
